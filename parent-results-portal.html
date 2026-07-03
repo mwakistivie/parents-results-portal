@@ -1,0 +1,1698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Results Portal</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0B1F3A;         /* deep navy - primary */
+  --ink-soft:#1E3A5F;
+  --seal:#B8862E;         /* muted gold - accent / seal */
+  --seal-bright:#D4A03E;
+  --paper:#F6F4EE;        /* warm paper background */
+  --paper-card:#FFFFFF;
+  --line:#DDD8CC;
+  --text-primary:#0B1F3A;
+  --text-secondary:#5B6B82;
+  --shadow:rgba(11,31,58,0.10);
+  --ok:#2F7A4F;
+  --warn:#B8862E;
+  --danger:#B23A3A;
+  --exceeding:#2F7A4F;
+  --meeting:#2E6CA4;
+  --approaching:#B8862E;
+  --below:#B23A3A;
+  --radius:14px;
+  --hover-bg:#EFEBDF;
+}
+[data-theme="dark"]{
+  --ink:#F6F4EE;
+  --paper:#0B1220;
+  --paper-card:#141C2E;
+  --line:#28324A;
+  --text-primary:#F0EEE6;
+  --text-secondary:#95A2BC;
+  --shadow:rgba(0,0,0,0.45);
+  --hover-bg:#1B2438;
+}
+*{box-sizing:border-box;}
+body{
+  background:var(--paper);
+  color:var(--text-primary);
+  font-family:'Inter',sans-serif;
+  transition:background-color .35s ease,color .35s ease;
+  margin:0;
+}
+.font-display{font-family:'Fraunces',serif;}
+.font-mono{font-family:'IBM Plex Mono',monospace;}
+.hidden{display:none !important;}
+.card{
+  background:var(--paper-card);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  box-shadow:0 8px 24px var(--shadow);
+}
+.seal-ring{
+  width:64px;height:64px;border-radius:50%;
+  border:2px solid var(--seal);
+  display:flex;align-items:center;justify-content:center;
+  position:relative;
+}
+.seal-ring::before{
+  content:'';position:absolute;inset:6px;border:1px dashed var(--seal);border-radius:50%;
+  opacity:.55;
+}
+.btn-primary{
+  background:var(--ink);color:var(--paper);
+  border-radius:10px;padding:.75rem 1.5rem;font-weight:600;
+  transition:transform .15s ease, box-shadow .15s ease, background .2s ease;
+  border:1px solid var(--ink);
+}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 18px var(--shadow);background:var(--ink-soft);}
+.btn-primary:disabled{opacity:.55;cursor:not-allowed;transform:none;}
+.btn-secondary{
+  background:transparent;color:var(--text-primary);
+  border:1px solid var(--line);border-radius:10px;padding:.75rem 1.25rem;font-weight:600;
+  transition:background .15s ease;
+}
+.btn-secondary:hover{background:var(--hover-bg);}
+.btn-gold{
+  background:var(--seal);color:#fff;border-radius:10px;padding:.6rem 1.1rem;font-weight:600;
+  transition:background .2s ease, transform .15s ease;
+}
+.btn-gold:hover{background:var(--seal-bright);transform:translateY(-1px);}
+input,select{
+  background:var(--paper-card);color:var(--text-primary);
+  border:1px solid var(--line);border-radius:10px;padding:.7rem 1rem;
+  transition:border-color .15s ease, box-shadow .15s ease;
+  width:100%;
+}
+input:focus,select:focus{outline:none;border-color:var(--seal);box-shadow:0 0 0 3px rgba(184,134,46,0.18);}
+input:focus-visible,select:focus-visible,button:focus-visible,a:focus-visible{
+  outline:2px solid var(--seal);outline-offset:2px;
+}
+.fade-transition{transition:opacity .3s ease-in-out;}
+
+/* Skeleton */
+.skeleton{
+  background:linear-gradient(90deg, var(--line) 25%, var(--hover-bg) 50%, var(--line) 75%);
+  background-size:200% 100%;
+  animation:loading 1.4s infinite;
+  border-radius:6px;
+}
+@keyframes loading{0%{background-position:200% 0;}100%{background-position:-200% 0;}}
+
+/* Motion */
+@keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
+@keyframes slideUp{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:translateY(0);}}
+.animate-fade{animation:fadeIn .4s ease both;}
+.animate-slide{animation:slideUp .45s cubic-bezier(.2,.7,.3,1) both;}
+@media (prefers-reduced-motion: reduce){
+  *{animation-duration:.001s !important;transition-duration:.001s !important;}
+}
+
+/* Level pills */
+.level-pill{
+  display:inline-flex;align-items:center;gap:.35rem;
+  padding:.2rem .65rem;border-radius:999px;font-size:.75rem;font-weight:700;letter-spacing:.02em;
+  color:#fff;
+}
+
+/* Modal */
+.modal-backdrop{
+  position:fixed;inset:0;background:rgba(11,31,58,.55);backdrop-filter:blur(2px);
+  display:flex;align-items:center;justify-content:center;z-index:60;opacity:0;pointer-events:none;
+  transition:opacity .25s ease;
+}
+.modal-backdrop.active{opacity:1;pointer-events:auto;}
+.modal-box{
+  background:var(--paper-card);border-radius:var(--radius);border:1px solid var(--line);
+  max-width:440px;width:92%;padding:1.75rem;box-shadow:0 24px 60px rgba(0,0,0,.3);
+  transform:translateY(12px);transition:transform .25s ease;
+}
+.modal-backdrop.active .modal-box{transform:translateY(0);}
+
+/* Toast */
+#toastContainer{position:fixed;top:1.25rem;right:1.25rem;z-index:80;display:flex;flex-direction:column;gap:.6rem;}
+.toast{
+  min-width:260px;max-width:340px;padding:.9rem 1.1rem;border-radius:10px;color:#fff;
+  box-shadow:0 12px 28px rgba(0,0,0,.25);
+  animation:slideUp .3s ease both;font-size:.9rem;
+}
+.toast.info{background:var(--ink-soft);}
+.toast.success{background:var(--ok);}
+.toast.warning{background:var(--warn);}
+.toast.error{background:var(--danger);}
+
+/* table */
+table{border-collapse:collapse;width:100%;}
+thead th{
+  position:sticky;top:0;background:var(--paper-card);
+  border-bottom:2px solid var(--line);text-align:left;padding:.75rem 1rem;font-size:.75rem;
+  text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);
+}
+tbody td{padding:.85rem 1rem;border-bottom:1px solid var(--line);}
+tbody tr{transition:background .15s ease;}
+tbody tr:hover{background:var(--hover-bg);}
+
+/* lock banner */
+.lock-banner{
+  background:rgba(178,58,58,.08);border:1px solid var(--danger);color:var(--danger);
+  border-radius:10px;padding:.85rem 1rem;font-size:.85rem;
+}
+
+@media print{
+  .no-print{display:none !important;}
+  body{background:#fff;}
+  .card{box-shadow:none;border:1px solid #ccc;}
+}
+
+/* ---------------- Formal Report Card (screen preview + print + PDF source) ---------------- */
+.report-card{
+  display:none;
+  background:#fff;color:#111827;
+  max-width:760px;margin:0 auto;
+  border:2px solid #0B1F3A;padding:40px 44px;
+  font-family:'Inter',sans-serif;
+}
+.report-card.preview-active{display:block;}
+@media print{
+  #dashboardPage{display:none !important;}
+  .report-card{display:block !important;border:2px solid #0B1F3A;max-width:100%;margin:0;box-shadow:none;}
+  body{padding:0;margin:0;}
+}
+.rc-header{text-align:center;border-bottom:2px solid #0B1F3A;padding-bottom:14px;margin-bottom:18px;}
+.rc-crest{margin:0 auto 8px;display:block;}
+.rc-school-name{font-family:'Fraunces',serif;font-weight:700;font-size:20px;letter-spacing:.03em;color:#0B1F3A;margin:0;}
+.rc-motto{font-style:italic;font-size:12.5px;color:#B8862E;margin:2px 0 8px;}
+.rc-title{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#111827;border-top:1px solid #DDD8CC;padding-top:8px;display:inline-block;margin-top:4px;}
+.rc-info-grid{display:grid;grid-template-columns:1fr 1fr;gap:0;margin-bottom:20px;border:1px solid #DDD8CC;}
+.rc-info-cell{padding:9px 14px;border-bottom:1px solid #DDD8CC;font-size:12.5px;display:flex;justify-content:space-between;gap:10px;}
+.rc-info-cell:nth-child(odd){border-right:1px solid #DDD8CC;}
+.rc-info-cell .rc-label{color:#5B6B82;font-weight:600;text-transform:uppercase;font-size:10px;letter-spacing:.04em;}
+.rc-info-cell .rc-value{font-weight:700;color:#0B1F3A;}
+.rc-section-title{font-family:'Fraunces',serif;font-size:14px;font-weight:600;color:#0B1F3A;margin:22px 0 8px;padding-bottom:4px;border-bottom:1px solid #DDD8CC;}
+.rc-table{width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:4px;}
+.rc-table th{background:#0B1F3A;color:#fff;text-align:left;padding:8px 12px;font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;}
+.rc-table td{padding:7px 12px;border-bottom:1px solid #DDD8CC;}
+.rc-table tr:nth-child(even) td{background:#F6F4EE;}
+.rc-summary{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:4px;border:1px solid #DDD8CC;}
+.rc-summary td{padding:8px 12px;border-bottom:1px solid #DDD8CC;}
+.rc-summary tr:last-child td{border-bottom:none;}
+.rc-summary td:first-child{width:34%;font-weight:600;color:#5B6B82;text-transform:uppercase;font-size:10px;letter-spacing:.04em;background:#F6F4EE;}
+.rc-summary td:last-child{font-weight:600;color:#0B1F3A;}
+.rc-signatures{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:44px;}
+.rc-sig-line{border-top:1px solid #111827;padding-top:6px;font-size:11px;color:#5B6B82;}
+.rc-sig-name{font-size:12.5px;font-weight:600;color:#0B1F3A;margin-bottom:26px;}
+.rc-footer-note{text-align:center;font-size:9.5px;color:#5B6B82;margin-top:30px;border-top:1px solid #DDD8CC;padding-top:10px;}
+
+</style>
+</head>
+<body data-theme="light">
+
+<div id="toastContainer" aria-live="polite"></div>
+
+<div id="loadingOverlay" class="hidden fixed inset-0 z-50 flex items-center justify-center" style="background:rgba(11,31,58,.35);backdrop-filter:blur(1px);">
+  <div class="card px-8 py-6 flex items-center gap-4">
+    <div class="seal-ring" style="width:36px;height:36px;">
+      <div style="width:14px;height:14px;border-radius:50%;background:var(--seal);animation:fadeIn 1s ease infinite alternate;"></div>
+    </div>
+    <span class="font-medium" id="loadingText">Working...</span>
+  </div>
+</div>
+
+<!-- ============ LOGIN PAGE ============ -->
+<section id="loginPage" class="min-h-screen flex flex-col fade-transition">
+  <header class="no-print px-6 md:px-10 py-6 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="seal-ring"><span class="font-display text-lg" style="color:var(--seal);">R</span></div>
+      <div>
+        <p class="font-display text-lg leading-tight" id="schoolNameLabel">Results Portal</p>
+        <p class="text-xs" style="color:var(--text-secondary);">Parent &amp; Guardian Access</p>
+      </div>
+    </div>
+    <button id="themeToggle" class="btn-secondary text-sm">🌙 Dark Mode</button>
+  </header>
+
+  <main class="flex-1 flex items-center justify-center px-6 py-10">
+    <div class="w-full max-w-5xl grid md:grid-cols-2 gap-10 items-center">
+      <div class="animate-slide hidden md:block">
+        <p class="uppercase text-xs font-semibold tracking-widest mb-3" style="color:var(--seal);">Termly Academic Records</p>
+        <h1 class="font-display text-4xl md:text-5xl leading-tight mb-4">Every result,<br>held with care.</h1>
+        <p class="text-base mb-8" style="color:var(--text-secondary);max-width:34ch;">
+          Enter your child's admission number and PIN to view competency-based results, teacher remarks, and performance trends the moment they're released.
+        </p>
+        <div class="flex gap-8">
+          <div>
+            <p class="font-display text-2xl" style="color:var(--seal);">CBC</p>
+            <p class="text-xs" style="color:var(--text-secondary);">Competency-based reporting</p>
+          </div>
+          <div>
+            <p class="font-display text-2xl" style="color:var(--seal);">24/7</p>
+            <p class="text-xs" style="color:var(--text-secondary);">Always available</p>
+          </div>
+          <div>
+            <p class="font-display text-2xl" style="color:var(--seal);">Secure</p>
+            <p class="text-xs" style="color:var(--text-secondary);">Rate-limited &amp; PIN protected</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card p-8 animate-slide">
+        <h2 class="font-display text-2xl mb-1">Check results</h2>
+        <p class="text-sm mb-6" style="color:var(--text-secondary);">Sign in with your child's details.</p>
+
+        <div id="lockoutBanner" class="lock-banner mb-4 hidden"></div>
+
+        <form id="loginForm" novalidate>
+          <div class="mb-4">
+            <label class="text-sm font-medium mb-1.5 block" for="admissionNumber">Admission Number</label>
+            <input type="text" id="admissionNumber" placeholder="e.g. STA-2024-118" autocomplete="off" required>
+          </div>
+          <div class="mb-2">
+            <label class="text-sm font-medium mb-1.5 block" for="pin">PIN</label>
+            <div class="relative">
+              <input type="password" id="pin" placeholder="4-digit PIN" inputmode="numeric" maxlength="8" autocomplete="off" required>
+              <button type="button" id="togglePinVisibility" class="absolute right-3 top-1/2 -translate-y-1/2 text-sm" style="color:var(--text-secondary);top:50%;transform:translateY(-50%);position:absolute;right:12px;background:none;border:none;cursor:pointer;">Show</button>
+            </div>
+          </div>
+          <div class="flex items-center justify-between mb-6 mt-3">
+            <label class="flex items-center gap-2 text-sm" style="color:var(--text-secondary);">
+              <input type="checkbox" id="rememberMe" style="width:auto;"> Remember admission number
+            </label>
+          </div>
+          <p id="loginError" class="text-sm mb-4 hidden" style="color:var(--danger);"></p>
+          <button type="submit" id="loginSubmitBtn" class="btn-primary w-full">View Results</button>
+        </form>
+      </div>
+    </div>
+  </main>
+
+  <footer class="no-print text-center text-xs py-6" style="color:var(--text-secondary);">
+    Trouble logging in? Contact the school office @ 0758952463. &middot; Press <span class="font-mono">?</span> for keyboard shortcuts once signed in.
+  </footer>
+</section>
+
+<!-- ============ DASHBOARD PAGE ============ -->
+<section id="dashboardPage" class="min-h-screen hidden fade-transition">
+  <header class="no-print sticky top-0 z-30 border-b" style="border-color:var(--line);background:var(--paper);">
+    <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="seal-ring" style="width:44px;height:44px;"><span class="font-display" style="color:var(--seal);">R</span></div>
+        <div>
+          <p class="font-semibold leading-tight" id="studentNameHeader">Student Name</p>
+          <p class="text-xs" style="color:var(--text-secondary);" id="studentMetaHeader">Adm No. &middot; Grade</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="themeToggleDash" class="btn-secondary text-sm hidden md:inline-block">🌙</button>
+        <button id="helpBtn" class="btn-secondary text-sm hidden md:inline-block" title="Keyboard shortcuts (?)">?</button>
+        <button id="settingsBtn" class="btn-secondary text-sm">Settings</button>
+        <button id="logoutBtn" class="btn-gold text-sm">Sign Out</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-6 py-8">
+
+    <!-- Summary cards -->
+    <div id="summaryCards" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8"></div>
+
+    <!-- Filters -->
+    <div class="card p-5 mb-6 no-print">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div>
+          <label class="text-xs font-semibold mb-1.5 block" style="color:var(--text-secondary);">Search</label>
+          <input type="text" id="searchSubject" placeholder="Search learning areas...">
+        </div>
+        <div>
+          <label class="text-xs font-semibold mb-1.5 block" style="color:var(--text-secondary);">Level</label>
+          <select id="filterLevel">
+            <option value="">All Levels</option>
+            <option value="EE">Exceeding (EE)</option>
+            <option value="ME">Meeting (ME)</option>
+            <option value="AE">Approaching (AE)</option>
+            <option value="BE">Below (BE)</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs font-semibold mb-1.5 block" style="color:var(--text-secondary);">Sort by</label>
+          <select id="sortBy">
+            <option value="name">Name (A–Z)</option>
+            <option value="marks-desc">Highest Marks</option>
+            <option value="marks-asc">Lowest Marks</option>
+          </select>
+        </div>
+        <div class="flex items-end">
+          <button id="resetFilters" class="btn-secondary w-full">Reset</button>
+        </div>
+      </div>
+      <p class="text-xs mt-4" style="color:var(--text-secondary);" id="resultsCount">Showing all learning areas</p>
+    </div>
+
+    <div class="grid md:grid-cols-5 gap-6">
+      <!-- Results table -->
+      <div class="md:col-span-3 card overflow-hidden">
+        <div class="px-5 py-4 border-b flex items-center justify-between" style="border-color:var(--line);">
+          <h3 class="font-display text-lg">Learning Areas</h3>
+          <div class="flex gap-2 no-print">
+            <button id="downloadCsvBtn" class="btn-secondary text-xs">Export CSV</button>
+          </div>
+        </div>
+        <div style="max-height:480px;overflow:auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>Learning Area</th>
+                <th>Marks</th>
+                <th>Level</th>
+              </tr>
+            </thead>
+            <tbody id="resultsTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Chart -->
+      <div class="md:col-span-2 card p-5">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-display text-lg">Performance</h3>
+        </div>
+        <div class="flex gap-2 mb-4 flex-wrap no-print">
+          <button data-chart-type="bar" class="chart-toggle-btn btn-gold text-xs active">Bar</button>
+          <button data-chart-type="pie" class="chart-toggle-btn btn-secondary text-xs">Pie</button>
+          <button data-chart-type="line" class="chart-toggle-btn btn-secondary text-xs">Trend</button>
+          <button data-chart-type="radar" class="chart-toggle-btn btn-secondary text-xs">Radar</button>
+        </div>
+        <canvas id="performanceChart" height="240"></canvas>
+      </div>
+    </div>
+
+    <!-- Remarks + actions -->
+    <div class="grid md:grid-cols-3 gap-6 mt-6">
+      <div class="card p-5 md:col-span-2">
+        <h3 class="font-display text-lg mb-2">Teacher's Remarks</h3>
+        <p class="text-sm" id="remarksText" style="color:var(--text-secondary);">—</p>
+      </div>
+      <div class="card p-5 flex flex-col gap-3 no-print">
+        <h3 class="font-display text-lg mb-1">Actions</h3>
+        <button id="printBtn" class="btn-secondary text-sm">🖨️ Print Report Card</button>
+        <button id="downloadPdfBtn" class="btn-secondary text-sm">⬇ Download PDF</button>
+      </div>
+    </div>
+
+    <!-- Coming soon -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8 no-print">
+      <div class="card p-4 opacity-60"><p class="text-sm font-medium">Attendance</p><p class="text-xs" style="color:var(--text-secondary);">Coming soon</p></div>
+      <div class="card p-4 opacity-60"><p class="text-sm font-medium">Fees &amp; M-Pesa</p><p class="text-xs" style="color:var(--text-secondary);">Coming soon</p></div>
+      <div class="card p-4 opacity-60"><p class="text-sm font-medium">Messages</p><p class="text-xs" style="color:var(--text-secondary);">Coming soon</p></div>
+      <div class="card p-4 opacity-60"><p class="text-sm font-medium">Term Timetable</p><p class="text-xs" style="color:var(--text-secondary);">Coming soon</p></div>
+    </div>
+  </main>
+</section>
+
+<!-- ============ FORMAL REPORT CARD (print + PDF source of truth) ============ -->
+<!-- Hidden on screen (.report-card is display:none by default); shown only
+     via window.print() (see @media print rule) or previewed in the modal below. -->
+<div id="reportCardOutput" class="report-card" aria-hidden="true">
+  <div class="rc-header">
+    <svg class="rc-crest" width="56" height="56" viewBox="0 0 56 56" xmlns="http://www.w3.org/2000/svg">
+      <path d="M28 3 L50 12 V26 C50 40 40 49 28 53 C16 49 6 40 6 26 V12 Z" fill="none" stroke="#0B1F3A" stroke-width="2"/>
+      <path d="M28 3 L50 12 V26 C50 40 40 49 28 53 C16 49 6 40 6 26 V12 Z" fill="none" stroke="#B8862E" stroke-width="1" transform="scale(0.86)" transform-origin="28 28"/>
+      <line x1="28" y1="16" x2="28" y2="40" stroke="#B8862E" stroke-width="2.5"/>
+      <line x1="19" y1="24" x2="37" y2="24" stroke="#B8862E" stroke-width="2.5"/>
+    </svg>
+    <p class="rc-school-name" id="rcSchoolName">ST. THOMAS CATHOLIC ACADEMY</p>
+    <p class="rc-motto" id="rcMotto">Domine Dirige Nos</p>
+    <span class="rc-title">Student Report Card</span>
+  </div>
+
+  <div class="rc-info-grid">
+    <div class="rc-info-cell"><span class="rc-label">Name</span><span class="rc-value" id="rcName">—</span></div>
+    <div class="rc-info-cell"><span class="rc-label">Admission No</span><span class="rc-value" id="rcAdmissionNo">—</span></div>
+    <div class="rc-info-cell"><span class="rc-label">Grade</span><span class="rc-value" id="rcGrade">—</span></div>
+    <div class="rc-info-cell"><span class="rc-label">Stream</span><span class="rc-value" id="rcStream">—</span></div>
+    <div class="rc-info-cell"><span class="rc-label">Term</span><span class="rc-value" id="rcTerm">—</span></div>
+    <div class="rc-info-cell"><span class="rc-label">Exam</span><span class="rc-value" id="rcExam">—</span></div>
+  </div>
+
+  <p class="rc-section-title">Academic Performance</p>
+  <table class="rc-table">
+    <thead><tr><th>Learning Area</th><th>Marks</th><th>Level</th></tr></thead>
+    <tbody id="rcSubjectsBody"></tbody>
+  </table>
+
+  <p class="rc-section-title">Performance Summary</p>
+  <table class="rc-summary">
+    <tr><td>Total</td><td id="rcTotal">—</td></tr>
+    <tr><td>Overall Level</td><td id="rcOverallLevel">—</td></tr>
+    <tr><td>Position</td><td id="rcPosition">—</td></tr>
+    <tr><td>Remarks</td><td id="rcRemarks">—</td></tr>
+  </table>
+
+  <div class="rc-signatures">
+    <div>
+      <p class="rc-sig-name" id="rcClassTeacher">&nbsp;</p>
+      <p class="rc-sig-line">Class Teacher</p>
+    </div>
+    <div>
+      <p class="rc-sig-name" id="rcHeadTeacher">&nbsp;</p>
+      <p class="rc-sig-line">Head Teacher</p>
+    </div>
+  </div>
+
+  <p class="rc-footer-note">This is a system-generated report card. Contact the school office for any queries.</p>
+</div>
+
+<!-- Skeleton template (used to populate table while loading) -->
+<template id="resultsTableSkeleton">
+  <tr><td colspan="3"><div class="skeleton" style="height:1rem;width:70%;"></div></td></tr>
+  <tr><td colspan="3"><div class="skeleton" style="height:1rem;width:55%;"></div></td></tr>
+  <tr><td colspan="3"><div class="skeleton" style="height:1rem;width:65%;"></div></td></tr>
+  <tr><td colspan="3"><div class="skeleton" style="height:1rem;width:40%;"></div></td></tr>
+</template>
+
+<!-- ============ SETTINGS MODAL ============ -->
+<div id="settingsModal" class="modal-backdrop no-print">
+  <div class="modal-box">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="font-display text-xl">Account Settings</h2>
+      <button class="modal-close text-lg" data-target="settingsModal" style="background:none;border:none;cursor:pointer;">✕</button>
+    </div>
+    <form id="changePinForm">
+      <div class="mb-3">
+        <label class="text-sm font-medium mb-1.5 block">Current PIN</label>
+        <input type="password" id="currentPin" inputmode="numeric" maxlength="8" required>
+      </div>
+      <div class="mb-3">
+        <label class="text-sm font-medium mb-1.5 block">New PIN</label>
+        <input type="password" id="newPin" inputmode="numeric" maxlength="8" required>
+        <div class="mt-2 h-1.5 rounded-full overflow-hidden" style="background:var(--line);">
+          <div id="pinStrengthBar" style="height:100%;width:0%;background:var(--danger);transition:all .2s ease;"></div>
+        </div>
+      </div>
+      <div class="mb-4">
+        <label class="text-sm font-medium mb-1.5 block">Confirm New PIN</label>
+        <input type="password" id="confirmPin" inputmode="numeric" maxlength="8" required>
+      </div>
+      <p id="pinChangeError" class="text-sm mb-4 hidden" style="color:var(--danger);"></p>
+      <div class="flex gap-3">
+        <button type="button" class="btn-secondary flex-1 modal-close" data-target="settingsModal">Cancel</button>
+        <button type="submit" class="btn-primary flex-1">Update PIN</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ============ SESSION WARNING MODAL ============ -->
+<div id="sessionWarningModal" class="modal-backdrop no-print">
+  <div class="modal-box">
+    <h2 class="font-display text-xl mb-2">Session Expiring Soon</h2>
+    <p class="text-sm mb-6" style="color:var(--text-secondary);">
+      For security, you'll be signed out in <span class="font-mono font-semibold" id="countdown" style="color:var(--text-primary);">2:00</span> due to inactivity.
+    </p>
+    <div class="flex gap-3">
+      <button id="staySignedInBtn" class="btn-primary flex-1">Stay Signed In</button>
+      <button id="sessionLogoutBtn" class="btn-secondary flex-1">Sign Out</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ KEYBOARD SHORTCUTS MODAL ============ -->
+<div id="shortcutsModal" class="modal-backdrop no-print">
+  <div class="modal-box">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="font-display text-xl">Keyboard Shortcuts</h2>
+      <button class="modal-close text-lg" data-target="shortcutsModal" style="background:none;border:none;cursor:pointer;">✕</button>
+    </div>
+    <table class="text-sm w-full">
+      <tbody>
+        <tr><td class="font-mono py-1.5" style="color:var(--seal);">Ctrl/Cmd + P</td><td>Print report card</td></tr>
+        <tr><td class="font-mono py-1.5" style="color:var(--seal);">Ctrl/Cmd + D</td><td>Download PDF</td></tr>
+        <tr><td class="font-mono py-1.5" style="color:var(--seal);">Ctrl/Cmd + S</td><td>Open settings</td></tr>
+        <tr><td class="font-mono py-1.5" style="color:var(--seal);">Ctrl/Cmd + L</td><td>Sign out</td></tr>
+        <tr><td class="font-mono py-1.5" style="color:var(--seal);">?</td><td>Show this help</td></tr>
+        <tr><td class="font-mono py-1.5" style="color:var(--seal);">Esc</td><td>Close dialogs</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+/* =========================================================================
+   CONFIG
+   ========================================================================= */
+const CONFIG = {
+  schoolName: 'ST. THOMAS CATHOLIC ACADEMY',
+  motto: 'Domine Dirige Nos',
+  scriptUrl: 'https://script.google.com/macros/s/AKfycbzhqO4SNz7YFXtJMDxYXzEs-i_jlQYCXo1Euk262XX9Q1Drem15-TL_uqQbeQRbOlpU/exec', // TODO: replace with your deployment ID
+  sessionTimeoutMinutes: 15,
+  useMockData: false // set false once scriptUrl is live
+};
+document.getElementById('schoolNameLabel').textContent = 'Results Portal';
+document.getElementById('rcSchoolName').textContent = CONFIG.schoolName;
+document.getElementById('rcMotto').textContent = CONFIG.motto;
+document.title = CONFIG.schoolName;
+
+/* =========================================================================
+   STATE
+   ========================================================================= */
+const state = {
+  studentData: null,
+  admissionNo: null,
+  pin: null
+};
+
+/* =========================================================================
+   RATE LIMITING
+   -------------------------------------------------------------------------
+   Two layers:
+   1. LoginRateLimiter — tracks failed login attempts per admission number
+      in localStorage, with escalating lockout (exponential backoff), so a
+      page refresh cannot be used to bypass the lockout.
+   2. TokenBucket — a general-purpose request throttle applied to every
+      backend call (login, PIN change, error logging, etc.) so a script or
+      a stuck retry loop can't hammer the Apps Script endpoint.
+   ========================================================================= */
+class LoginRateLimiter {
+  constructor(opts = {}) {
+    this.maxAttempts = opts.maxAttempts ?? 5;
+    this.windowMs = opts.windowMs ?? 15 * 60 * 1000;   // 15 min rolling window
+    this.baseLockMs = opts.baseLockMs ?? 30 * 1000;    // first lock: 30s
+    this.maxLockMs = opts.maxLockMs ?? 30 * 60 * 1000; // cap at 30 min
+    this.storagePrefix = 'rl_login_';
+  }
+
+  _key(identifier) {
+    // Hash-free, low-cardinality key; identifier is an admission number, not a secret.
+    return this.storagePrefix + String(identifier || 'anonymous').trim().toLowerCase();
+  }
+
+  _load(identifier) {
+    try {
+      const raw = localStorage.getItem(this._key(identifier));
+      return raw ? JSON.parse(raw) : { attempts: [], lockedUntil: 0, lockCount: 0 };
+    } catch {
+      return { attempts: [], lockedUntil: 0, lockCount: 0 };
+    }
+  }
+
+  _save(identifier, data) {
+    try { localStorage.setItem(this._key(identifier), JSON.stringify(data)); } catch {}
+  }
+
+  status(identifier) {
+    const data = this._load(identifier);
+    const now = Date.now();
+    const locked = now < data.lockedUntil;
+    return {
+      locked,
+      msRemaining: locked ? data.lockedUntil - now : 0,
+      attemptsUsed: data.attempts.filter(t => now - t < this.windowMs).length,
+      attemptsLeft: Math.max(0, this.maxAttempts - data.attempts.filter(t => now - t < this.windowMs).length)
+    };
+  }
+
+  recordFailure(identifier) {
+    const data = this._load(identifier);
+    const now = Date.now();
+    data.attempts = data.attempts.filter(t => now - t < this.windowMs);
+    data.attempts.push(now);
+
+    if (data.attempts.length >= this.maxAttempts) {
+      data.lockCount = (data.lockCount || 0) + 1;
+      const duration = Math.min(this.baseLockMs * Math.pow(2, data.lockCount - 1), this.maxLockMs);
+      data.lockedUntil = now + duration;
+      data.attempts = []; // reset window once locked
+    }
+    this._save(identifier, data);
+    return this.status(identifier);
+  }
+
+  recordSuccess(identifier) {
+    this._save(identifier, { attempts: [], lockedUntil: 0, lockCount: 0 });
+  }
+}
+
+class TokenBucket {
+  constructor(capacity = 8, refillPerSecond = 0.4) {
+    this.capacity = capacity;
+    this.tokens = capacity;
+    this.refillPerSecond = refillPerSecond;
+    this.lastRefill = Date.now();
+  }
+
+  _refill() {
+    const now = Date.now();
+    const elapsedSec = (now - this.lastRefill) / 1000;
+    this.tokens = Math.min(this.capacity, this.tokens + elapsedSec * this.refillPerSecond);
+    this.lastRefill = now;
+  }
+
+  tryConsume(cost = 1) {
+    this._refill();
+    if (this.tokens >= cost) {
+      this.tokens -= cost;
+      return true;
+    }
+    return false;
+  }
+
+  msUntilAvailable(cost = 1) {
+    this._refill();
+    if (this.tokens >= cost) return 0;
+    return Math.ceil(((cost - this.tokens) / this.refillPerSecond) * 1000);
+  }
+}
+
+const loginRateLimiter = new LoginRateLimiter();
+const apiRateLimiter = new TokenBucket(8, 0.4); // 8 burst, refills ~1 token/2.5s
+
+/** Wrap every backend call through the shared token bucket. */
+async function rateLimitedCall(fn, { cost = 1, context = 'request' } = {}) {
+  if (!apiRateLimiter.tryConsume(cost)) {
+    const waitMs = apiRateLimiter.msUntilAvailable(cost);
+    const waitSec = Math.ceil(waitMs / 1000);
+    showNotification(`Too many requests — please wait ${waitSec}s and try again.`, 'warning');
+    throw new Error(`RateLimited:${context}`);
+  }
+  return fn();
+}
+
+/* =========================================================================
+   API LAYER (Google Apps Script)
+   ========================================================================= */
+async function callGoogleAppsScript(functionName, params = []) {
+  if (CONFIG.useMockData) return mockApiCall(functionName, params);
+
+  const response = await fetch(CONFIG.scriptUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ function: functionName, parameters: params })
+  });
+  if (!response.ok) {
+    const err = new Error(`Request failed (${response.status})`);
+    err.name = 'NetworkError';
+    throw err;
+  }
+  const data = await response.json();
+  if (data.error) throw new Error(data.error);
+  return data.result;
+}
+
+function mockApiCall(functionName, params) {
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      if (functionName === 'getStudentResult') {
+        const [admissionNo, pin] = params;
+        if (admissionNo === 'STA-2024-118' && pin === '1234') {
+          const subjects = [
+            { name: 'Mathematics', marks: 84 },
+            { name: 'English', marks: 86 },
+            { name: 'Kiswahili', marks: 80 },
+            { name: 'Integrated Science', marks: 84 },
+            { name: 'Pre-Technical Studies', marks: 74 },
+            { name: 'Agriculture', marks: 93 },
+            { name: 'CRE', marks: 83 },
+            { name: 'Social Studies', marks: 90 },
+            { name: 'Art & Sport', marks: 91 }
+          ].map(s => ({ ...s, ...levelCodeFromMarks(s.marks) }));
+
+          const totalMarks = subjects.reduce((sum, s) => sum + s.marks, 0);
+          const overall = overallLevelFromSubjects(subjects);
+
+          resolve({
+            studentName: 'Alpha John Mwaniki',
+            admissionNo: 'STA004',
+            grade: 'Grade 9',
+            stream: 'Winners',
+            term: 'Term 2',
+            examName: 'Midterm',
+            totalMarks,
+            overallLevel: overall.overallBand,
+            overallLevelCode: overall.overallCode,
+            overallBreakdown: overall.breakdown,
+            position: '3 of 45',
+            remarks: 'Alpha has put in consistent effort this term, with particularly strong performance in Agriculture and Art & Sport. Focused revision in Pre-Technical Studies will help push that grade into the exceeding band next term.',
+            classTeacher: 'Mrs. J. Kamau',
+            headTeacher: 'Mr. P. Otieno',
+            subjects
+          });
+        } else {
+          reject(new Error('Invalid Admission number or PIN'));
+        }
+      } else if (functionName === 'changeStudentPin') {
+        resolve({ success: true });
+      } else if (functionName === 'logError') {
+        resolve({ logged: true });
+      } else if (functionName === 'getSettings') {
+        resolve({ schoolName: CONFIG.schoolName });
+      } else {
+        resolve(null);
+      }
+    }, 600 + Math.random() * 500);
+  });
+}
+
+/* =========================================================================
+   ERROR HANDLING
+   ========================================================================= */
+class ErrorHandler {
+  static async handle(error, context = '') {
+    console.error(`Error in ${context}:`, error);
+    if (String(error.message).startsWith('RateLimited:')) return; // already surfaced
+
+    let message = 'An unexpected error occurred. Please try again.';
+    let severity = 'error';
+
+    if (error.name === 'NetworkError') {
+      message = 'Network error — please check your connection.';
+    } else if (/pin/i.test(error.message)) {
+      message = error.message;
+    } else if (/admission/i.test(error.message)) {
+      message = error.message;
+    } else if (/timeout/i.test(error.message)) {
+      message = 'Request timed out. Please try again.';
+      severity = 'warning';
+    }
+
+    showNotification(message, severity);
+
+    try {
+      await rateLimitedCall(() => callGoogleAppsScript('logError', [{
+        message: error.message,
+        context,
+        userAgent: navigator.userAgent,
+        timestamp: new Date().toISOString()
+      }]), { cost: 1, context: 'logError' });
+    } catch (e) {
+      console.error('Failed to log error remotely:', e);
+    }
+  }
+}
+
+/* =========================================================================
+   NOTIFICATIONS
+   ========================================================================= */
+function showNotification(message, type = 'info') {
+  const container = document.getElementById('toastContainer');
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.textContent = message;
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.style.transition = 'opacity .3s ease, transform .3s ease';
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(-8px)';
+    setTimeout(() => toast.remove(), 300);
+  }, 4000);
+}
+
+function showLoading(text = 'Working...') {
+  document.getElementById('loadingText').textContent = text;
+  document.getElementById('loadingOverlay').classList.remove('hidden');
+}
+function hideLoading() {
+  document.getElementById('loadingOverlay').classList.add('hidden');
+}
+
+/* =========================================================================
+   PAGE TRANSITIONS
+   ========================================================================= */
+function transitionTo(fromId, toId) {
+  const from = document.getElementById(fromId);
+  const to = document.getElementById(toId);
+  from.style.transition = 'opacity .3s ease';
+  from.style.opacity = '0';
+  setTimeout(() => {
+    from.classList.add('hidden');
+    to.classList.remove('hidden');
+    to.style.opacity = '0';
+    to.offsetHeight; // reflow
+    to.style.transition = 'opacity .3s ease';
+    to.style.opacity = '1';
+  }, 300);
+}
+
+/* =========================================================================
+   MODALS
+   ========================================================================= */
+function openModal(id) { document.getElementById(id).classList.add('active'); }
+function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+function closeAllModals() {
+  document.querySelectorAll('.modal-backdrop.active').forEach(m => m.classList.remove('active'));
+}
+document.querySelectorAll('.modal-close').forEach(btn => {
+  btn.addEventListener('click', () => closeModal(btn.dataset.target));
+});
+document.querySelectorAll('.modal-backdrop').forEach(backdrop => {
+  backdrop.addEventListener('click', (e) => { if (e.target === backdrop) closeModal(backdrop.id); });
+});
+
+/* =========================================================================
+   SESSION MANAGEMENT
+   ========================================================================= */
+class SessionManager {
+  constructor(timeoutMinutes = 15) {
+    this.timeoutDuration = timeoutMinutes * 60 * 1000;
+    this.warningTime = 2 * 60 * 1000;
+    this.timeoutId = null;
+    this.warningId = null;
+    this.countdownInterval = null;
+    this.active = false;
+  }
+  start() {
+    this.active = true;
+    ['mousedown', 'keydown', 'touchstart', 'scroll'].forEach(evt => {
+      document.addEventListener(evt, this._boundReset || (this._boundReset = () => this.resetTimer()));
+    });
+    this.resetTimer();
+  }
+  stop() {
+    this.active = false;
+    clearTimeout(this.timeoutId);
+    clearTimeout(this.warningId);
+    clearInterval(this.countdownInterval);
+  }
+  resetTimer() {
+    if (!this.active) return;
+    clearTimeout(this.timeoutId);
+    clearTimeout(this.warningId);
+    clearInterval(this.countdownInterval);
+    closeModal('sessionWarningModal');
+
+    this.warningId = setTimeout(() => this.showWarning(), this.timeoutDuration - this.warningTime);
+    this.timeoutId = setTimeout(() => this.expire(), this.timeoutDuration);
+  }
+  showWarning() {
+    openModal('sessionWarningModal');
+    let seconds = Math.floor(this.warningTime / 1000);
+    const countdownEl = document.getElementById('countdown');
+    countdownEl.textContent = this._format(seconds);
+    this.countdownInterval = setInterval(() => {
+      seconds--;
+      countdownEl.textContent = this._format(seconds);
+      if (seconds <= 0) clearInterval(this.countdownInterval);
+    }, 1000);
+  }
+  _format(totalSeconds) {
+    const m = Math.max(0, Math.floor(totalSeconds / 60));
+    const s = Math.max(0, totalSeconds % 60);
+    return `${m}:${String(s).padStart(2, '0')}`;
+  }
+  expire() {
+    showNotification('Session expired due to inactivity. Please sign in again.', 'warning');
+    handleLogout();
+  }
+}
+const sessionManager = new SessionManager(CONFIG.sessionTimeoutMinutes);
+document.getElementById('staySignedInBtn').addEventListener('click', () => sessionManager.resetTimer());
+document.getElementById('sessionLogoutBtn').addEventListener('click', () => handleLogout());
+
+/* =========================================================================
+   LOGIN FLOW (with rate limiting)
+   ========================================================================= */
+const loginForm = document.getElementById('loginForm');
+const loginSubmitBtn = document.getElementById('loginSubmitBtn');
+const loginErrorEl = document.getElementById('loginError');
+const lockoutBanner = document.getElementById('lockoutBanner');
+let lockoutTicker = null;
+
+document.getElementById('togglePinVisibility').addEventListener('click', (e) => {
+  const pinInput = document.getElementById('pin');
+  const isPassword = pinInput.type === 'password';
+  pinInput.type = isPassword ? 'text' : 'password';
+  e.target.textContent = isPassword ? 'Hide' : 'Show';
+});
+
+// Restore remembered admission number
+(function restoreRemembered() {
+  const remembered = localStorage.getItem('rememberedAdmissionNo');
+  if (remembered) {
+    document.getElementById('admissionNumber').value = remembered;
+    document.getElementById('rememberMe').checked = true;
+  }
+})();
+
+function refreshLockoutUI(admissionNo) {
+  const status = loginRateLimiter.status(admissionNo);
+  if (status.locked) {
+    loginSubmitBtn.disabled = true;
+    lockoutBanner.classList.remove('hidden');
+    const update = () => {
+      const s = loginRateLimiter.status(admissionNo);
+      if (!s.locked) {
+        lockoutBanner.classList.add('hidden');
+        loginSubmitBtn.disabled = false;
+        clearInterval(lockoutTicker);
+        return;
+      }
+      const secs = Math.ceil(s.msRemaining / 1000);
+      const mm = Math.floor(secs / 60);
+      const ss = secs % 60;
+      lockoutBanner.textContent = `Too many failed attempts. Try again in ${mm}:${String(ss).padStart(2, '0')}.`;
+    };
+    update();
+    clearInterval(lockoutTicker);
+    lockoutTicker = setInterval(update, 1000);
+  } else {
+    lockoutBanner.classList.add('hidden');
+    loginSubmitBtn.disabled = false;
+    clearInterval(lockoutTicker);
+  }
+}
+
+document.getElementById('admissionNumber').addEventListener('blur', (e) => {
+  if (e.target.value.trim()) refreshLockoutUI(e.target.value.trim());
+});
+
+loginForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  handleLogin();
+});
+
+async function handleLogin() {
+  loginErrorEl.classList.add('hidden');
+  const admissionNo = document.getElementById('admissionNumber').value.trim();
+  const pin = document.getElementById('pin').value.trim();
+
+  try {
+    if (!admissionNo || !pin) {
+      throw new Error('Admission number and PIN are required.');
+    }
+
+    const lockStatus = loginRateLimiter.status(admissionNo);
+    if (lockStatus.locked) {
+      refreshLockoutUI(admissionNo);
+      throw new Error(`Account temporarily locked. Try again shortly.`);
+    }
+
+    loginSubmitBtn.disabled = true;
+    loginSubmitBtn.textContent = 'Signing in...';
+    showLoading('Verifying details...');
+
+    const result = await rateLimitedCall(
+      () => callGoogleAppsScript('getStudentResult', [admissionNo, pin]),
+      { cost: 2, context: 'login' }
+    );
+
+    loginRateLimiter.recordSuccess(admissionNo);
+
+    if (document.getElementById('rememberMe').checked) {
+      localStorage.setItem('rememberedAdmissionNo', admissionNo);
+    } else {
+      localStorage.removeItem('rememberedAdmissionNo');
+    }
+
+    state.studentData = result;
+    state.admissionNo = admissionNo;
+    state.pin = pin;
+
+    hideLoading();
+    showSkeletonLoader();
+    transitionTo('loginPage', 'dashboardPage');
+    setTimeout(() => {
+      displayDashboard();
+      sessionManager.start();
+      showNotification(`Welcome back — results loaded for ${result.studentName}.`, 'success');
+    }, 320);
+
+  } catch (error) {
+    hideLoading();
+    if (!String(error.message).startsWith('RateLimited:')) {
+      const status = loginRateLimiter.recordFailure(admissionNo);
+      refreshLockoutUI(admissionNo);
+      if (status.locked) {
+        loginErrorEl.textContent = 'Too many failed attempts. Access temporarily locked.';
+      } else {
+        loginErrorEl.textContent = `${error.message} (${status.attemptsLeft} attempt${status.attemptsLeft === 1 ? '' : 's'} remaining)`;
+      }
+      loginErrorEl.classList.remove('hidden');
+    }
+    ErrorHandler.handle(error, 'handleLogin');
+  } finally {
+    loginSubmitBtn.disabled = loginRateLimiter.status(admissionNo).locked;
+    loginSubmitBtn.textContent = 'View Results';
+  }
+}
+
+function handleLogout() {
+  sessionManager.stop();
+  closeAllModals();
+  state.studentData = null;
+  state.pin = null;
+  document.getElementById('pin').value = '';
+  transitionTo('dashboardPage', 'loginPage');
+}
+document.getElementById('logoutBtn').addEventListener('click', handleLogout);
+
+/* =========================================================================
+   SKELETON LOADING
+   ========================================================================= */
+function showSkeletonLoader() {
+  const skeletonHtml = document.getElementById('resultsTableSkeleton').innerHTML;
+  document.getElementById('resultsTableBody').innerHTML = skeletonHtml;
+}
+
+/* =========================================================================
+   DASHBOARD RENDERING
+   ========================================================================= */
+/**
+ * Derives a CBC-style band + numeric sub-level (e.g. 84 -> {level:'EE', levelCode:'EE7'})
+ * from raw marks. Used so Overall Level / per-subject Level are always computed,
+ * never left blank.
+ */
+function levelCodeFromMarks(marks) {
+  const bands = [
+    { level: 'BE', min: 0,  max: 24, subMin: 1 },
+    { level: 'AE', min: 25, max: 49, subMin: 3 },
+    { level: 'ME', min: 50, max: 74, subMin: 5 },
+    { level: 'EE', min: 75, max: 100, subMin: 7 }
+  ];
+  const band = bands.find(b => marks >= b.min && marks <= b.max) || bands[bands.length - 1];
+  const half = band.min + Math.ceil((band.max - band.min) / 2);
+  const sub = marks > half ? band.subMin + 1 : band.subMin;
+  return { level: band.level, levelCode: `${band.level}${sub}` };
+}
+
+// Ordered 1–8 point scale underlying the band + sub-level codes above.
+const LEVEL_POINTS_ORDER = ['BE1', 'BE2', 'AE3', 'AE4', 'ME5', 'ME6', 'EE7', 'EE8'];
+
+function levelPointFromCode(code) {
+  const n = parseInt(String(code).replace(/[^0-9]/g, ''), 10);
+  return Number.isFinite(n) ? Math.min(8, Math.max(1, n)) : 1;
+}
+
+/**
+ * Builds the "EE7+ME6+...=ME5 47" style overall-level breakdown: every
+ * subject's level code, summed to a total point score, averaged back into
+ * a single overall band + sub-level.
+ */
+function overallLevelFromSubjects(subjects) {
+  const points = subjects.map(s => levelPointFromCode(s.levelCode));
+  const sum = points.reduce((a, b) => a + b, 0);
+  const avgPoint = Math.min(8, Math.max(1, Math.round(sum / points.length)));
+  const overallCode = LEVEL_POINTS_ORDER[avgPoint - 1];
+  const overallBand = overallCode.replace(/[0-9]/g, '');
+  const breakdown = `${subjects.map(s => s.levelCode).join('+')} = ${overallCode} (${sum})`;
+  return { overallBand, overallCode, sum, breakdown };
+}
+
+const LEVEL_META = {
+  EE: { label: 'Exceeding',   color: 'var(--exceeding)' },
+  ME: { label: 'Meeting',     color: 'var(--meeting)' },
+  AE: { label: 'Approaching', color: 'var(--approaching)' },
+  BE: { label: 'Below',       color: 'var(--below)' }
+};
+function getCompetencyColor(level) { return LEVEL_META[level]?.color || 'var(--text-secondary)'; }
+function getCompetencyLabel(level) { return LEVEL_META[level]?.label || level; }
+
+let resultsFilter, chartManager;
+
+function displayDashboard() {
+  const data = state.studentData;
+  document.getElementById('studentNameHeader').textContent = data.studentName;
+  document.getElementById('studentMetaHeader').textContent = `${data.admissionNo} · ${data.grade}`;
+  document.getElementById('remarksText').textContent = data.remarks || 'No remarks recorded for this term.';
+
+  document.getElementById('summaryCards').innerHTML = `
+    ${summaryCard('Total Marks', data.totalMarks, '')}
+    ${summaryCard('Overall Level', `${getCompetencyLabel(data.overallLevel)} (${data.overallLevelCode || data.overallLevel})`, data.overallLevel, { subtext: data.overallBreakdown, spanClass: 'md:col-span-2' })}
+    ${summaryCard('Position', data.position, '')}
+    ${summaryCard('Learning Areas', data.subjects.length, '')}
+  `;
+
+  resultsFilter = new ResultsFilter(data.subjects);
+  chartManager = new ChartManager(data.subjects);
+
+  cacheStudentDataLocally(data.admissionNo, data);
+}
+
+function summaryCard(label, value, level, options = {}) {
+  const badge = level ? `<span class="level-pill" style="background:${getCompetencyColor(level)}">${level}</span>` : '';
+  const subtext = options.subtext
+    ? `<p class="font-mono text-xs mt-1.5 break-all" style="color:var(--text-secondary);">${escapeHtml(options.subtext)}</p>`
+    : '';
+  return `
+    <div class="card p-4 animate-slide ${options.spanClass || ''}">
+      <p class="text-xs mb-1" style="color:var(--text-secondary);">${label}</p>
+      <div class="flex items-center gap-2">
+        <p class="font-display text-2xl">${value}</p>${badge}
+      </div>
+      ${subtext}
+    </div>`;
+}
+
+function renderResultsTable(subjects) {
+  const tbody = document.getElementById('resultsTableBody');
+  if (!subjects.length) {
+    tbody.innerHTML = `<tr><td colspan="3" class="text-center py-8" style="color:var(--text-secondary);">No learning areas match your filters.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = subjects.map((s, i) => `
+    <tr class="animate-fade" style="animation-delay:${i * 40}ms">
+      <td class="font-medium">${escapeHtml(s.name)}</td>
+      <td class="font-mono">${s.marks}</td>
+      <td><span class="level-pill" style="background:${getCompetencyColor(s.level)}">${s.levelCode || s.level}</span></td>
+    </tr>
+  `).join('');
+}
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+/* =========================================================================
+   ADVANCED FILTERING
+   ========================================================================= */
+class ResultsFilter {
+  constructor(subjects) {
+    this.originalSubjects = [...subjects];
+    this.filteredSubjects = [...subjects];
+    this.setupEventListeners();
+    this.render();
+  }
+  setupEventListeners() {
+    document.getElementById('searchSubject').addEventListener('input', (e) => this.apply({ search: e.target.value }));
+    document.getElementById('filterLevel').addEventListener('change', (e) => this.apply({ level: e.target.value }));
+    document.getElementById('sortBy').addEventListener('change', (e) => this.apply({ sort: e.target.value }));
+    document.getElementById('resetFilters').addEventListener('click', () => this.reset());
+  }
+  apply({ search, level, sort } = {}) {
+    this._search = search ?? this._search ?? '';
+    this._level = level ?? this._level ?? '';
+    this._sort = sort ?? this._sort ?? 'name';
+
+    let result = [...this.originalSubjects];
+    if (this._search) {
+      result = result.filter(s => s.name.toLowerCase().includes(this._search.toLowerCase()));
+    }
+    if (this._level) {
+      result = result.filter(s => s.level === this._level);
+    }
+    switch (this._sort) {
+      case 'marks-desc': result.sort((a, b) => b.marks - a.marks); break;
+      case 'marks-asc': result.sort((a, b) => a.marks - b.marks); break;
+      default: result.sort((a, b) => a.name.localeCompare(b.name));
+    }
+    this.filteredSubjects = result;
+    this.render();
+  }
+  render() {
+    renderResultsTable(this.filteredSubjects);
+    document.getElementById('resultsCount').textContent =
+      `Showing ${this.filteredSubjects.length} of ${this.originalSubjects.length} learning areas`;
+  }
+  reset() {
+    document.getElementById('searchSubject').value = '';
+    document.getElementById('filterLevel').value = '';
+    document.getElementById('sortBy').value = 'name';
+    this._search = ''; this._level = ''; this._sort = 'name';
+    this.filteredSubjects = [...this.originalSubjects];
+    this.render();
+  }
+}
+
+/* =========================================================================
+   CHARTS
+   ========================================================================= */
+class ChartManager {
+  constructor(subjects) {
+    this.subjects = subjects;
+    this.currentChart = null;
+    this.setupToggle();
+    this.createBarChart();
+  }
+  setupToggle() {
+    document.querySelectorAll('.chart-toggle-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        document.querySelectorAll('.chart-toggle-btn').forEach(b => {
+          b.classList.remove('btn-gold', 'active');
+          b.classList.add('btn-secondary');
+        });
+        e.currentTarget.classList.remove('btn-secondary');
+        e.currentTarget.classList.add('btn-gold', 'active');
+        this.switchChart(e.currentTarget.dataset.chartType);
+      });
+    });
+  }
+  switchChart(type) {
+    if (this.currentChart) this.currentChart.destroy();
+    if (type === 'bar') this.createBarChart();
+    else if (type === 'pie') this.createPieChart();
+    else if (type === 'line') this.createLineChart();
+    else if (type === 'radar') this.createRadarChart();
+  }
+  ctx() { return document.getElementById('performanceChart').getContext('2d'); }
+  createBarChart() {
+    this.currentChart = new Chart(this.ctx(), {
+      type: 'bar',
+      data: {
+        labels: this.subjects.map(s => s.name),
+        datasets: [{ label: 'Marks', data: this.subjects.map(s => s.marks),
+          backgroundColor: this.subjects.map(s => getCompetencyColorResolved(s.level)), borderRadius: 6 }]
+      },
+      options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, max: 100 } } }
+    });
+  }
+  createPieChart() {
+    this.currentChart = new Chart(this.ctx(), {
+      type: 'doughnut',
+      data: {
+        labels: this.subjects.map(s => s.name),
+        datasets: [{ data: this.subjects.map(s => s.marks), backgroundColor: this.subjects.map(s => getCompetencyColorResolved(s.level)) }]
+      },
+      options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } } }
+    });
+  }
+  createLineChart() {
+    this.currentChart = new Chart(this.ctx(), {
+      type: 'line',
+      data: {
+        labels: ['Term 1', 'Term 2', 'Term 3'],
+        datasets: [{ label: 'Average Marks', data: [68, 74, Math.round(this.subjects.reduce((a, s) => a + s.marks, 0) / this.subjects.length)],
+          borderColor: '#B8862E', tension: 0.4, fill: false, pointRadius: 5, pointBackgroundColor: '#B8862E' }]
+      },
+      options: { responsive: true, scales: { y: { beginAtZero: true, max: 100 } } }
+    });
+  }
+  createRadarChart() {
+    this.currentChart = new Chart(this.ctx(), {
+      type: 'radar',
+      data: {
+        labels: this.subjects.map(s => s.name),
+        datasets: [{ label: 'Performance', data: this.subjects.map(s => s.marks),
+          borderColor: '#0B1F3A', backgroundColor: 'rgba(11,31,58,0.12)', pointBackgroundColor: '#0B1F3A' }]
+      },
+      options: { responsive: true, scales: { r: { beginAtZero: true, max: 100 } } }
+    });
+  }
+}
+function getCompetencyColorResolved(level) {
+  const map = { EE: '#2F7A4F', ME: '#2E6CA4', AE: '#B8862E', BE: '#B23A3A' };
+  return map[level] || '#5B6B82';
+}
+
+/* =========================================================================
+   KEYBOARD SHORTCUTS
+   ========================================================================= */
+document.addEventListener('keydown', (e) => {
+  if (document.getElementById('dashboardPage').classList.contains('hidden')) return;
+  if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) {
+    if (e.key === 'Escape') { closeAllModals(); }
+    return;
+  }
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey) {
+    switch (e.key.toLowerCase()) {
+      case 'p': e.preventDefault(); printReportCard(); break;
+      case 'd': e.preventDefault(); downloadReportCardPdf(); break;
+      case 's': e.preventDefault(); openModal('settingsModal'); break;
+      case 'l': e.preventDefault(); handleLogout(); break;
+    }
+  }
+  if (e.key === '?') { e.preventDefault(); openModal('shortcutsModal'); }
+  if (e.key === 'Escape') { closeAllModals(); }
+});
+document.getElementById('helpBtn').addEventListener('click', () => openModal('shortcutsModal'));
+
+/* =========================================================================
+   PRINT / PDF — formal report card (matches: logo, school name, motto, title,
+   Name/Admission No, Grade/Stream, Term/Exam, Academic Performance table,
+   Performance Summary [Total/Overall Level/Position/Remarks], signatures)
+   ========================================================================= */
+function populateReportCardTemplate(data) {
+  document.getElementById('rcName').textContent = data.studentName;
+  document.getElementById('rcAdmissionNo').textContent = data.admissionNo;
+  document.getElementById('rcGrade').textContent = data.grade;
+  document.getElementById('rcStream').textContent = data.stream || '—';
+  document.getElementById('rcTerm').textContent = data.term || '—';
+  document.getElementById('rcExam').textContent = data.examName || '—';
+
+  document.getElementById('rcSubjectsBody').innerHTML = data.subjects.map(s => `
+    <tr>
+      <td>${escapeHtml(s.name)}</td>
+      <td>${s.marks}</td>
+      <td>${s.levelCode || s.level}</td>
+    </tr>
+  `).join('');
+
+  document.getElementById('rcTotal').textContent = data.totalMarks;
+  document.getElementById('rcOverallLevel').textContent =
+    data.overallBreakdown || `${data.overallLevelCode || data.overallLevel} — ${getCompetencyLabel(data.overallLevel)}`;
+  document.getElementById('rcOverallLevel').style.fontFamily = "'IBM Plex Mono', monospace";
+  document.getElementById('rcOverallLevel').style.fontSize = '11.5px';
+  document.getElementById('rcOverallLevel').style.letterSpacing = '0';
+  document.getElementById('rcPosition').textContent = data.position || '—';
+  document.getElementById('rcRemarks').textContent = data.remarks || 'No remarks recorded for this term.';
+
+  document.getElementById('rcClassTeacher').textContent = data.classTeacher || '\u00A0';
+  document.getElementById('rcHeadTeacher').textContent = data.headTeacher || '\u00A0';
+}
+
+function printReportCard() {
+  const data = state.studentData;
+  if (!data) { showNotification('No results loaded yet.', 'warning'); return; }
+  populateReportCardTemplate(data);
+  showNotification('Opening print dialog…', 'info');
+  // Let the DOM update before the browser snapshots it for print.
+  requestAnimationFrame(() => setTimeout(() => window.print(), 30));
+}
+document.getElementById('printBtn').addEventListener('click', printReportCard);
+document.getElementById('downloadPdfBtn').addEventListener('click', downloadReportCardPdf);
+
+/**
+ * Generates an actual PDF file client-side with jsPDF + autotable — mirrors
+ * the on-screen/print report card exactly — and triggers a direct download,
+ * no print dialog involved.
+ */
+function downloadReportCardPdf() {
+  const data = state.studentData;
+  if (!data) { showNotification('No results loaded yet.', 'warning'); return; }
+
+  try {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 54;
+    const navy = [11, 31, 58];
+    const gold = [184, 134, 46];
+    const grey = [91, 107, 130];
+    const line = [221, 216, 204];
+    let y = 50;
+
+    // Outer border for a formal, certificate-like frame
+    doc.setDrawColor(...navy);
+    doc.setLineWidth(1.4);
+    doc.rect(28, 28, pageWidth - 56, doc.internal.pageSize.getHeight() - 56);
+
+    // --- Crest (shield outline + cross, simple safe vector shapes) ---
+    const cx = pageWidth / 2;
+    doc.setDrawColor(...navy);
+    doc.setLineWidth(1.3);
+    doc.roundedRect(cx - 13, y - 13, 26, 30, 6, 6, 'S');
+    doc.setDrawColor(...gold);
+    doc.setLineWidth(1.6);
+    doc.line(cx, y - 6, cx, y + 10);
+    doc.line(cx - 6, y + 2, cx + 6, y + 2);
+    y += 30;
+
+    // --- School name / motto / title ---
+    doc.setFont('times', 'bold');
+    doc.setFontSize(17);
+    doc.setTextColor(...navy);
+    doc.text(CONFIG.schoolName, cx, y, { align: 'center' });
+    y += 16;
+    doc.setFont('times', 'italic');
+    doc.setFontSize(10.5);
+    doc.setTextColor(...gold);
+    doc.text(CONFIG.motto, cx, y, { align: 'center' });
+    y += 18;
+    doc.setDrawColor(...navy);
+    doc.setLineWidth(1);
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 16;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(30, 30, 30);
+    doc.text('STUDENT REPORT CARD', cx, y, { align: 'center', charSpace: 0.6 });
+    y += 22;
+
+    // --- Info grid: Name/Admission No, Grade/Stream, Term/Exam ---
+    const infoRows = [
+      ['Name', data.studentName, 'Admission No', data.admissionNo],
+      ['Grade', data.grade, 'Stream', data.stream || '—'],
+      ['Term', data.term || '—', 'Exam', data.examName || '—']
+    ];
+    doc.autoTable({
+      startY: y,
+      margin: { left: margin, right: margin },
+      body: infoRows,
+      styles: { font: 'helvetica', fontSize: 9.5, cellPadding: 6, textColor: navy, lineColor: line, lineWidth: 0.5 },
+      columnStyles: {
+        0: { fontStyle: 'bold', textColor: grey, fontSize: 8, cellWidth: 90 },
+        1: { fontStyle: 'bold' },
+        2: { fontStyle: 'bold', textColor: grey, fontSize: 8, cellWidth: 90 },
+        3: { fontStyle: 'bold' }
+      },
+      theme: 'grid'
+    });
+    y = doc.lastAutoTable.finalY + 20;
+
+    // --- Academic Performance ---
+    doc.setFont('times', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(...navy);
+    doc.text('Academic Performance', margin, y);
+    y += 8;
+
+    doc.autoTable({
+      startY: y,
+      margin: { left: margin, right: margin },
+      head: [['Learning Area', 'Marks', 'Level']],
+      body: data.subjects.map(s => [s.name, String(s.marks), s.levelCode || s.level]),
+      styles: { font: 'helvetica', fontSize: 9.5, cellPadding: 6, textColor: navy, lineColor: line, lineWidth: 0.5 },
+      headStyles: { fillColor: navy, textColor: 255, fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [246, 244, 238] },
+      theme: 'grid'
+    });
+    y = doc.lastAutoTable.finalY + 20;
+
+    // --- Performance Summary ---
+    doc.setFont('times', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(...navy);
+    doc.text('Performance Summary', margin, y);
+    y += 8;
+
+    doc.autoTable({
+      startY: y,
+      margin: { left: margin, right: margin },
+      body: [
+        ['Total', String(data.totalMarks)],
+        ['Overall Level', data.overallBreakdown || `${data.overallLevelCode || data.overallLevel} — ${getCompetencyLabel(data.overallLevel)}`],
+        ['Position', data.position || '—'],
+        ['Remarks', data.remarks || 'No remarks recorded for this term.']
+      ],
+      styles: { font: 'helvetica', fontSize: 9.5, cellPadding: 7, textColor: navy, lineColor: line, lineWidth: 0.5 },
+      columnStyles: { 0: { fontStyle: 'bold', textColor: grey, fontSize: 8, cellWidth: 110, fillColor: [246, 244, 238] } },
+      theme: 'grid'
+    });
+    y = doc.lastAutoTable.finalY + 46;
+
+    // --- Signatures: Class Teacher / Head Teacher ---
+    const colWidth = (pageWidth - margin * 2 - 40) / 2;
+    [
+      { label: 'Class Teacher', name: data.classTeacher, x: margin },
+      { label: 'Head Teacher', name: data.headTeacher, x: margin + colWidth + 40 }
+    ].forEach(sig => {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9.5);
+      doc.setTextColor(...navy);
+      doc.text(sig.name || '', sig.x, y - 6);
+      doc.setDrawColor(30, 30, 30);
+      doc.setLineWidth(0.6);
+      doc.line(sig.x, y, sig.x + colWidth, y);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.setTextColor(...grey);
+      doc.text(sig.label, sig.x, y + 12);
+    });
+
+    // --- Footer ---
+    const pageHeight = doc.internal.pageSize.getHeight();
+    doc.setFontSize(7.5);
+    doc.setTextColor(...grey);
+    doc.text('This is a system-generated report card. Contact the school office for any queries.', cx, pageHeight - 40, { align: 'center' });
+
+    const filename = `report-card_${data.admissionNo}_${new Date().toISOString().split('T')[0]}.pdf`;
+    doc.save(filename);
+    showNotification('Report card PDF downloaded.', 'success');
+  } catch (error) {
+    ErrorHandler.handle(error, 'downloadReportCardPdf');
+  }
+}
+
+/* =========================================================================
+   CSV EXPORT
+   ========================================================================= */
+function exportToCSV() {
+  const data = state.studentData;
+  if (!data) return;
+  const headers = ['Learning Area', 'Marks', 'Level', 'Competency'];
+  const rows = data.subjects.map(s => [s.name, s.marks, s.level, getCompetencyLabel(s.level)]);
+  rows.push([]);
+  rows.push(['Summary']);
+  rows.push(['Total Marks', data.totalMarks]);
+  rows.push(['Overall Level', getCompetencyLabel(data.overallLevel)]);
+  rows.push(['Position', data.position]);
+  rows.push(['Remarks', data.remarks]);
+
+  const csv = [headers, ...rows].map(row => row.map(escapeCSV).join(',')).join('\n');
+  downloadFile(csv, `results_${data.admissionNo}_${new Date().toISOString().split('T')[0]}.csv`, 'text/csv');
+  showNotification('CSV downloaded.', 'success');
+}
+function escapeCSV(value) {
+  if (value === null || value === undefined) return '';
+  const str = String(value);
+  return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+}
+function downloadFile(content, filename, type) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url; link.download = filename;
+  document.body.appendChild(link); link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+document.getElementById('downloadCsvBtn').addEventListener('click', exportToCSV);
+
+/* =========================================================================
+   INDEXEDDB CACHE
+   ========================================================================= */
+class DataCache {
+  constructor(dbName = 'ResultsPortal', version = 1) {
+    this.dbName = dbName; this.version = version; this.db = null;
+  }
+  init() {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(this.dbName, this.version);
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => { this.db = request.result; resolve(this.db); };
+      request.onupgradeneeded = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains('results')) db.createObjectStore('results', { keyPath: 'admissionNo' });
+      };
+    });
+  }
+  async set(storeName, data) {
+    const tx = this.db.transaction([storeName], 'readwrite');
+    return new Promise((resolve, reject) => {
+      const req = tx.objectStore(storeName).put(data);
+      req.onerror = () => reject(req.error);
+      req.onsuccess = () => resolve(req.result);
+    });
+  }
+  async get(storeName, key) {
+    const tx = this.db.transaction([storeName], 'readonly');
+    return new Promise((resolve, reject) => {
+      const req = tx.objectStore(storeName).get(key);
+      req.onerror = () => reject(req.error);
+      req.onsuccess = () => resolve(req.result);
+    });
+  }
+}
+const cache = new DataCache();
+cache.init().catch(err => console.warn('Cache unavailable:', err));
+
+async function cacheStudentDataLocally(admissionNo, data) {
+  try { await cache.set('results', { admissionNo, data, timestamp: Date.now() }); }
+  catch (err) { console.warn('Failed to cache results:', err); }
+}
+
+/* =========================================================================
+   THEME MANAGER
+   ========================================================================= */
+class ThemeManager {
+  constructor() { this.key = 'preferredTheme'; this.init(); }
+  init() {
+    const saved = localStorage.getItem(this.key);
+    if (saved) this.setTheme(saved);
+    else this.setTheme(window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+
+    [document.getElementById('themeToggle'), document.getElementById('themeToggleDash')].forEach(btn => {
+      btn && btn.addEventListener('click', () => this.toggle());
+    });
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+      if (!localStorage.getItem(this.key)) this.setTheme(e.matches ? 'dark' : 'light');
+    });
+  }
+  setTheme(theme) {
+    document.body.setAttribute('data-theme', theme);
+    localStorage.setItem(this.key, theme);
+    const label = theme === 'dark' ? '☀️ Light Mode' : '🌙 Dark Mode';
+    const shortLabel = theme === 'dark' ? '☀️' : '🌙';
+    const t1 = document.getElementById('themeToggle');
+    const t2 = document.getElementById('themeToggleDash');
+    if (t1) t1.textContent = label;
+    if (t2) t2.textContent = shortLabel;
+  }
+  toggle() { this.setTheme(this.getCurrentTheme() === 'dark' ? 'light' : 'dark'); }
+  getCurrentTheme() { return document.body.getAttribute('data-theme') || 'light'; }
+}
+const themeManager = new ThemeManager();
+
+/* =========================================================================
+   SETTINGS: CHANGE PIN
+   ========================================================================= */
+document.getElementById('settingsBtn').addEventListener('click', () => openModal('settingsModal'));
+
+document.getElementById('newPin').addEventListener('input', (e) => {
+  const val = e.target.value;
+  let strength = 0;
+  if (val.length >= 4) strength += 40;
+  if (val.length >= 6) strength += 30;
+  if (new Set(val.split('')).size >= 3) strength += 30;
+  const bar = document.getElementById('pinStrengthBar');
+  bar.style.width = strength + '%';
+  bar.style.background = strength < 40 ? 'var(--danger)' : strength < 70 ? 'var(--warn)' : 'var(--ok)';
+});
+
+document.getElementById('changePinForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const errorEl = document.getElementById('pinChangeError');
+  errorEl.classList.add('hidden');
+  const currentPin = document.getElementById('currentPin').value.trim();
+  const newPin = document.getElementById('newPin').value.trim();
+  const confirmPin = document.getElementById('confirmPin').value.trim();
+  const submitBtn = e.target.querySelector('button[type="submit"]');
+
+  try {
+    if (!/^\d{4,8}$/.test(newPin)) throw new Error('PIN must be 4–8 digits.');
+    if (newPin !== confirmPin) throw new Error('New PIN and confirmation do not match.');
+    if (newPin === currentPin) throw new Error('New PIN must be different from current PIN.');
+
+    submitBtn.disabled = true;
+    showLoading('Updating PIN...');
+
+    await rateLimitedCall(
+      () => callGoogleAppsScript('changeStudentPin', [state.admissionNo, currentPin, newPin]),
+      { cost: 2, context: 'changePin' }
+    );
+
+    state.pin = newPin;
+    hideLoading();
+    closeModal('settingsModal');
+    e.target.reset();
+    document.getElementById('pinStrengthBar').style.width = '0%';
+    showNotification('PIN updated successfully.', 'success');
+  } catch (error) {
+    hideLoading();
+    if (!String(error.message).startsWith('RateLimited:')) {
+      errorEl.textContent = error.message;
+      errorEl.classList.remove('hidden');
+    }
+    ErrorHandler.handle(error, 'changePin');
+  } finally {
+    submitBtn.disabled = false;
+  }
+});
+
+/* =========================================================================
+   INIT
+   ========================================================================= */
+window.addEventListener('load', () => {
+  const perf = performance.getEntriesByType('navigation')[0];
+  if (perf) console.table({ 'Page Load (ms)': Math.round(perf.loadEventEnd - perf.fetchStart) });
+});
+</script>
+</body>
+</html>
