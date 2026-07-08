@@ -232,7 +232,7 @@ tbody tr:hover{background:var(--hover-bg);}
 <section id="loginPage" class="min-h-screen flex flex-col fade-transition">
   <header class="no-print px-6 md:px-10 py-6 flex items-center justify-between">
     <div class="flex items-center gap-3">
-      <div class="seal-ring"><span class="font-display text-lg" style="color:var(--seal);">R</span></div>
+      <div class="seal-ring" id="loginSealRing"><span class="font-display text-lg" style="color:var(--seal);">R</span></div>
       <div>
         <p class="font-display text-lg leading-tight" id="schoolNameLabel">Results Portal</p>
         <p class="text-xs" style="color:var(--text-secondary);">Parent &amp; Guardian Access</p>
@@ -477,12 +477,13 @@ tbody tr:hover{background:var(--hover-bg);}
      via window.print() (see @media print rule) or previewed in the modal below. -->
 <div id="reportCardOutput" class="report-card" aria-hidden="true">
   <div class="rc-header">
-    <svg class="rc-crest" width="56" height="56" viewBox="0 0 56 56" xmlns="http://www.w3.org/2000/svg">
+    <svg class="rc-crest" id="rcCrestSvg" width="56" height="56" viewBox="0 0 56 56" xmlns="http://www.w3.org/2000/svg">
       <path d="M28 3 L50 12 V26 C50 40 40 49 28 53 C16 49 6 40 6 26 V12 Z" fill="none" stroke="#0B1F3A" stroke-width="2"/>
       <path d="M28 3 L50 12 V26 C50 40 40 49 28 53 C16 49 6 40 6 26 V12 Z" fill="none" stroke="#B8862E" stroke-width="1" transform="scale(0.86)" transform-origin="28 28"/>
       <line x1="28" y1="16" x2="28" y2="40" stroke="#B8862E" stroke-width="2.5"/>
       <line x1="19" y1="24" x2="37" y2="24" stroke="#B8862E" stroke-width="2.5"/>
     </svg>
+    <img class="rc-crest hidden" id="rcCrestImg" width="56" height="56" alt="School logo" style="object-fit:contain;">
     <p class="rc-school-name" id="rcSchoolName">ST. THOMAS CATHOLIC ACADEMY</p>
     <p class="rc-motto" id="rcMotto">Domine Dirige Nos</p>
     <span class="rc-title">Student Report Card</span>
@@ -1405,7 +1406,16 @@ function overallLevelFromSubjects(subjects) {
  * always render identically.
  */
 function normalizeStudentResult(raw) {
-  const subjects = (raw.subjects || []).map(s => ({ ...s, ...levelCodeFromMarks(Number(s.marks)) }));
+  const subjects = (raw.subjects || []).map(s => {
+    const marks = Number(s.marks);
+    const computed = levelCodeFromMarks(marks);
+    // Prefer the level the sheet/backend already assigned (a teacher's or
+    // system's authoritative call) — only compute from raw marks as a
+    // fallback when that data isn't there yet (e.g. mock data, new rows).
+    const levelCode = s.levelCode || computed.levelCode;
+    const level = s.level || levelCode.replace(/[0-9]/g, '') || computed.level;
+    return { ...s, marks, level, levelCode };
+  });
   const totalMarks = raw.totalMarks ?? subjects.reduce((sum, s) => sum + s.marks, 0);
   const overall = subjects.length ? overallLevelFromSubjects(subjects) : { overallBand: '—', overallCode: '—', breakdown: 'No subjects recorded yet.' };
 
@@ -2016,6 +2026,41 @@ window.addEventListener('load', () => {
   const perf = performance.getEntriesByType('navigation')[0];
   if (perf) console.table({ 'Page Load (ms)': Math.round(perf.loadEventEnd - perf.fetchStart) });
 });
+
+/**
+ * Pulls SchoolName / Motto / LogoURL from the Settings sheet (via getSettings)
+ * and applies them across the login header and report card. Falls back
+ * silently to the CONFIG defaults already on the page if this fails or
+ * returns nothing (e.g. offline, or Settings sheet not fully filled in yet).
+ */
+(async function loadSchoolSettings() {
+  try {
+    const settings = await callGoogleAppsScript('getSettings');
+    if (!settings) return;
+
+    if (settings.schoolName) {
+      CONFIG.schoolName = settings.schoolName;
+      document.getElementById('rcSchoolName').textContent = settings.schoolName;
+      document.title = settings.schoolName;
+    }
+    if (settings.motto) {
+      CONFIG.motto = settings.motto;
+      document.getElementById('rcMotto').textContent = settings.motto;
+    }
+    if (settings.logoUrl) {
+      const rcImg = document.getElementById('rcCrestImg');
+      const rcSvg = document.getElementById('rcCrestSvg');
+      const loginRing = document.getElementById('loginSealRing');
+      rcImg.onload = () => { rcImg.classList.remove('hidden'); rcSvg.classList.add('hidden'); };
+      rcImg.onerror = () => { /* keep the vector crest fallback if the logo URL fails to load */ };
+      rcImg.src = settings.logoUrl;
+      loginRing.innerHTML = `<img src="${settings.logoUrl}" alt="School logo" style="width:100%;height:100%;object-fit:contain;border-radius:50%;">`;
+    }
+  } catch (err) {
+    console.warn('Could not load school settings — using defaults.', err);
+  }
+})();
+
 </script>
 </body>
 </html>
