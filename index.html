@@ -6,8 +6,8 @@
 <title>Results Portal</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
 <style>
@@ -300,6 +300,60 @@ tbody tr:hover{background:var(--hover-bg);}
   </footer>
 </section>
 
+<!-- ============ SUBSCRIPTION / STK PUSH PAYWALL ============ -->
+<section id="paywallPage" class="min-h-screen hidden fade-transition flex items-center justify-center px-6 py-10">
+  <div class="w-full max-w-md">
+    <div class="card p-8 animate-slide">
+
+      <!-- Step 1: fee summary + phone entry -->
+      <div id="paywallStepEntry">
+        <div class="seal-ring mb-4" style="width:52px;height:52px;"><span class="font-display text-lg" style="color:var(--seal);">₭</span></div>
+        <h2 class="font-display text-2xl mb-1">Unlock this term's results</h2>
+        <p class="text-sm mb-5" style="color:var(--text-secondary);">
+          A termly subscription of <span class="font-semibold" style="color:var(--text-primary);" id="paywallAmountLabel">KES 100</span>
+          gives <span id="paywallStudentNameLabel">your child</span>'s parent/guardian full access to
+          <span id="paywallTermLabel">this term</span>'s report card, charts, and downloads.
+        </p>
+
+        <form id="stkPushForm">
+          <label class="text-sm font-medium mb-1.5 block" for="mpesaPhone">M-Pesa Phone Number</label>
+          <input type="tel" id="mpesaPhone" placeholder="07XXXXXXXX or 2547XXXXXXXX" inputmode="numeric" required>
+          <p class="text-xs mt-2 mb-4" style="color:var(--text-secondary);">You'll receive an STK prompt on this number to enter your M-Pesa PIN.</p>
+          <p id="stkEntryError" class="text-sm mb-4 hidden" style="color:var(--danger);"></p>
+          <button type="submit" id="stkPushSubmitBtn" class="btn-primary w-full">Pay with M-Pesa</button>
+        </form>
+        <button id="paywallBackBtn" class="btn-secondary w-full mt-3 text-sm">← Back to sign in</button>
+      </div>
+
+      <!-- Step 2: waiting for STK confirmation -->
+      <div id="paywallStepPending" class="hidden text-center">
+        <div class="seal-ring mx-auto mb-4" style="width:56px;height:56px;">
+          <div style="width:16px;height:16px;border-radius:50%;background:var(--seal);animation:fadeIn 1s ease infinite alternate;"></div>
+        </div>
+        <h2 class="font-display text-xl mb-2">Check your phone</h2>
+        <p class="text-sm mb-1" style="color:var(--text-secondary);">
+          An STK push was sent to <span class="font-mono" id="stkPhoneDisplay" style="color:var(--text-primary);">—</span>.
+        </p>
+        <p class="text-sm mb-6" style="color:var(--text-secondary);">Enter your M-Pesa PIN on your phone to complete payment.</p>
+        <p class="font-mono text-2xl mb-6" id="stkCountdown" style="color:var(--seal);">1:30</p>
+        <button id="stkCancelBtn" class="btn-secondary w-full text-sm">Cancel</button>
+      </div>
+
+      <!-- Step 3: result -->
+      <div id="paywallStepResult" class="hidden text-center">
+        <div id="stkResultIcon" class="seal-ring mx-auto mb-4" style="width:56px;height:56px;"></div>
+        <h2 class="font-display text-xl mb-2" id="stkResultTitle">Payment received</h2>
+        <p class="text-sm mb-6" style="color:var(--text-secondary);" id="stkResultMessage">You now have access to this term's results.</p>
+        <button id="stkResultActionBtn" class="btn-primary w-full">Continue</button>
+      </div>
+
+    </div>
+    <p class="text-center text-xs mt-4" style="color:var(--text-secondary);">
+      Payments are processed via Safaricom M-Pesa. Subscription unlocks results for one term per student.
+    </p>
+  </div>
+</section>
+
 <!-- ============ DASHBOARD PAGE ============ -->
 <section id="dashboardPage" class="min-h-screen hidden fade-transition">
   <header class="no-print sticky top-0 z-30 border-b" style="border-color:var(--line);background:var(--paper);">
@@ -552,10 +606,15 @@ tbody tr:hover{background:var(--hover-bg);}
 const CONFIG = {
   schoolName: 'ST. THOMAS CATHOLIC ACADEMY',
   motto: 'Domine Dirige Nos',
-  scriptUrl: 'https://script.google.com/macros/s/AKfycbzhqO4SNz7YFXtJMDxYXzEs-i_jlQYCXo1Euk262XX9Q1Drem15-TL_uqQbeQRbOlpU/exec', // TODO: replace with your deployment ID
+  scriptUrl: 'https://script.google.com/macros/s/AKfycbzhqO4SNz7YFXtJMDxYXzEs-i_jlQYCXo1Euk262XX9Q1Drem15-TL_uqQbeQRbOlpU/exec',
   sessionTimeoutMinutes: 15,
-  useMockData: false // set false once scriptUrl is live
+  useMockData: false, // set false once scriptUrl is live
+  termlyFeeKES: 100,          // termly subscription price shown to parents
+  stkTimeoutSeconds: 90,      // how long to poll before giving up on an STK push
+  stkPollIntervalMs: 4000,    // how often to check payment status
+  stkCooldownSeconds: 45      // minimum gap between STK push attempts per admission number
 };
+document.getElementById('paywallAmountLabel').textContent = `KES ${CONFIG.termlyFeeKES}`;
 document.getElementById('schoolNameLabel').textContent = 'Results Portal';
 document.getElementById('rcSchoolName').textContent = CONFIG.schoolName;
 document.getElementById('rcMotto').textContent = CONFIG.motto;
@@ -713,21 +772,6 @@ function mockApiCall(functionName, params) {
       if (functionName === 'getStudentResult') {
         const [admissionNo, pin] = params;
         if (admissionNo === 'STA-2024-118' && pin === '1234') {
-          const subjects = [
-            { name: 'Mathematics', marks: 84 },
-            { name: 'English', marks: 86 },
-            { name: 'Kiswahili', marks: 80 },
-            { name: 'Integrated Science', marks: 84 },
-            { name: 'Pre-Technical Studies', marks: 74 },
-            { name: 'Agriculture', marks: 93 },
-            { name: 'CRE', marks: 83 },
-            { name: 'Social Studies', marks: 90 },
-            { name: 'Art & Sport', marks: 91 }
-          ].map(s => ({ ...s, ...levelCodeFromMarks(s.marks) }));
-
-          const totalMarks = subjects.reduce((sum, s) => sum + s.marks, 0);
-          const overall = overallLevelFromSubjects(subjects);
-
           resolve({
             studentName: 'Alpha John Mwaniki',
             admissionNo: 'STA004',
@@ -735,15 +779,24 @@ function mockApiCall(functionName, params) {
             stream: 'Winners',
             term: 'Term 2',
             examName: 'Midterm',
-            totalMarks,
-            overallLevel: overall.overallBand,
-            overallLevelCode: overall.overallCode,
-            overallBreakdown: overall.breakdown,
             position: '3 of 45',
             remarks: 'Alpha has put in consistent effort this term, with particularly strong performance in Agriculture and Art & Sport. Focused revision in Pre-Technical Studies will help push that grade into the exceeding band next term.',
             classTeacher: 'Mrs. J. Kamau',
             headTeacher: 'Mr. P. Otieno',
-            subjects
+            // Raw marks only — level codes, totals, and the overall breakdown
+            // are computed uniformly by normalizeStudentResult() for both
+            // mock and live (Google Sheet) data.
+            subjects: [
+              { name: 'Mathematics', marks: 84 },
+              { name: 'English', marks: 86 },
+              { name: 'Kiswahili', marks: 80 },
+              { name: 'Integrated Science', marks: 84 },
+              { name: 'Pre-Technical Studies', marks: 74 },
+              { name: 'Agriculture', marks: 93 },
+              { name: 'CRE', marks: 83 },
+              { name: 'Social Studies', marks: 90 },
+              { name: 'Art & Sport', marks: 91 }
+            ]
           });
         } else {
           reject(new Error('Invalid Admission number or PIN'));
@@ -754,11 +807,54 @@ function mockApiCall(functionName, params) {
         resolve({ logged: true });
       } else if (functionName === 'getSettings') {
         resolve({ schoolName: CONFIG.schoolName });
+      } else if (functionName === 'getSubscriptionStatus') {
+        const [admissionNo, term] = params;
+        const store = mockReadSubscriptions();
+        const key = `${admissionNo}::${term}`;
+        resolve({ subscribed: !!store[key], term });
+      } else if (functionName === 'initiateStkPush') {
+        const [admissionNo, phone, amount, term] = params;
+        if (!/^(?:\+?254|0)7\d{8}$/.test(phone)) {
+          reject(new Error('Invalid M-Pesa phone number.'));
+          return;
+        }
+        const checkoutRequestId = 'mock_' + Math.random().toString(36).slice(2, 12);
+        mockStkStore[checkoutRequestId] = {
+          admissionNo, term, phone, amount,
+          createdAt: Date.now(),
+          // Demo hook: a phone number containing "0000" simulates a declined/cancelled push.
+          willFail: String(phone).includes('0000')
+        };
+        resolve({ checkoutRequestId, status: 'PENDING' });
+      } else if (functionName === 'checkStkStatus') {
+        const [checkoutRequestId] = params;
+        const record = mockStkStore[checkoutRequestId];
+        if (!record) { reject(new Error('Unknown transaction.')); return; }
+        const elapsed = Date.now() - record.createdAt;
+        if (elapsed < 3500) {
+          resolve({ status: 'PENDING' });
+        } else if (record.willFail) {
+          resolve({ status: 'FAILED', reason: 'Request cancelled by user.' });
+        } else {
+          const store = mockReadSubscriptions();
+          store[`${record.admissionNo}::${record.term}`] = true;
+          mockWriteSubscriptions(store);
+          resolve({ status: 'SUCCESS', receiptNumber: 'MPX' + Math.random().toString(36).slice(2, 9).toUpperCase() });
+        }
       } else {
         resolve(null);
       }
     }, 600 + Math.random() * 500);
   });
+}
+
+// --- Mock-only "server-side" state, so the demo behaves consistently across polls/reloads ---
+const mockStkStore = {};
+function mockReadSubscriptions() {
+  try { return JSON.parse(localStorage.getItem('mockSubscriptions') || '{}'); } catch { return {}; }
+}
+function mockWriteSubscriptions(store) {
+  try { localStorage.setItem('mockSubscriptions', JSON.stringify(store)); } catch {}
 }
 
 /* =========================================================================
@@ -1011,18 +1107,29 @@ async function handleLogin() {
       localStorage.removeItem('rememberedAdmissionNo');
     }
 
-    state.studentData = result;
+    state.studentData = normalizeStudentResult(result);
     state.admissionNo = admissionNo;
     state.pin = pin;
 
+    const subscription = await rateLimitedCall(
+      () => callGoogleAppsScript('getSubscriptionStatus', [admissionNo, result.term]),
+      { cost: 1, context: 'subscriptionCheck' }
+    );
+
     hideLoading();
-    showSkeletonLoader();
-    transitionTo('loginPage', 'dashboardPage');
-    setTimeout(() => {
-      displayDashboard();
-      sessionManager.start();
-      showNotification(`Welcome back — results loaded for ${result.studentName}.`, 'success');
-    }, 320);
+
+    if (subscription.subscribed) {
+      showSkeletonLoader();
+      transitionTo('loginPage', 'dashboardPage');
+      setTimeout(() => {
+        displayDashboard();
+        sessionManager.start();
+        showNotification(`Welcome back — results loaded for ${result.studentName}.`, 'success');
+      }, 320);
+    } else {
+      openPaywall(result.term);
+      transitionTo('loginPage', 'paywallPage');
+    }
 
   } catch (error) {
     hideLoading();
@@ -1049,9 +1156,186 @@ function handleLogout() {
   state.studentData = null;
   state.pin = null;
   document.getElementById('pin').value = '';
-  transitionTo('dashboardPage', 'loginPage');
+  const currentPage = document.getElementById('dashboardPage').classList.contains('hidden') ? 'paywallPage' : 'dashboardPage';
+  transitionTo(currentPage, 'loginPage');
 }
 document.getElementById('logoutBtn').addEventListener('click', handleLogout);
+document.getElementById('paywallBackBtn').addEventListener('click', () => {
+  stkPollController.stop();
+  state.studentData = null;
+  state.pin = null;
+  document.getElementById('pin').value = '';
+  transitionTo('paywallPage', 'loginPage');
+});
+
+/* =========================================================================
+   SUBSCRIPTION / M-PESA STK PUSH
+   -------------------------------------------------------------------------
+   Client-side flow only. The actual Safaricom Daraja calls (OAuth token,
+   STK push request, callback handling) must happen server-side — see the
+   companion Apps Script template for the exact implementation, since it
+   requires your Consumer Key/Secret and Passkey, which must never sit in
+   browser-side code.
+   ========================================================================= */
+
+// Cooldown to stop a parent (or a bug) from firing repeated STK prompts to the same phone.
+class StkCooldown {
+  constructor(seconds) { this.seconds = seconds; this.key = 'stkLastInitiated'; }
+  msRemaining(admissionNo) {
+    try {
+      const store = JSON.parse(localStorage.getItem(this.key) || '{}');
+      const last = store[admissionNo] || 0;
+      const remaining = this.seconds * 1000 - (Date.now() - last);
+      return Math.max(0, remaining);
+    } catch { return 0; }
+  }
+  record(admissionNo) {
+    try {
+      const store = JSON.parse(localStorage.getItem(this.key) || '{}');
+      store[admissionNo] = Date.now();
+      localStorage.setItem(this.key, JSON.stringify(store));
+    } catch {}
+  }
+}
+const stkCooldown = new StkCooldown(CONFIG.stkCooldownSeconds);
+
+const stkPollController = (() => {
+  let pollTimer = null;
+  let countdownTimer = null;
+  return {
+    stop() {
+      clearInterval(pollTimer); clearInterval(countdownTimer);
+      pollTimer = null; countdownTimer = null;
+    },
+    start(checkoutRequestId, { onSuccess, onFailure, onTimeout }) {
+      this.stop();
+      const deadline = Date.now() + CONFIG.stkTimeoutSeconds * 1000;
+
+      const countdownEl = document.getElementById('stkCountdown');
+      countdownTimer = setInterval(() => {
+        const remaining = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+        const m = Math.floor(remaining / 60), s = remaining % 60;
+        countdownEl.textContent = `${m}:${String(s).padStart(2, '0')}`;
+        if (remaining <= 0) clearInterval(countdownTimer);
+      }, 1000);
+
+      pollTimer = setInterval(async () => {
+        if (Date.now() > deadline) { this.stop(); onTimeout(); return; }
+        try {
+          const status = await rateLimitedCall(
+            () => callGoogleAppsScript('checkStkStatus', [checkoutRequestId]),
+            { cost: 1, context: 'stkPoll' }
+          );
+          if (status.status === 'SUCCESS') { this.stop(); onSuccess(status); }
+          else if (status.status === 'FAILED') { this.stop(); onFailure(status); }
+          // PENDING → keep polling
+        } catch (e) {
+          if (!String(e.message).startsWith('RateLimited:')) { this.stop(); onFailure({ reason: e.message }); }
+        }
+      }, CONFIG.stkPollIntervalMs);
+    }
+  };
+})();
+
+function showPaywallStep(step) {
+  ['Entry', 'Pending', 'Result'].forEach(s => {
+    document.getElementById(`paywallStep${s}`).classList.toggle('hidden', s !== step);
+  });
+}
+
+function openPaywall(term) {
+  document.getElementById('paywallStudentNameLabel').textContent =
+    state.studentData ? `${state.studentData.studentName}'s` : "Your child's";
+  document.getElementById('paywallTermLabel').textContent = term || 'this term';
+  document.getElementById('stkEntryError').classList.add('hidden');
+  document.getElementById('mpesaPhone').value = '';
+  showPaywallStep('Entry');
+}
+
+document.getElementById('stkPushForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const errorEl = document.getElementById('stkEntryError');
+  errorEl.classList.add('hidden');
+  const phone = document.getElementById('mpesaPhone').value.trim();
+  const submitBtn = document.getElementById('stkPushSubmitBtn');
+
+  const cooldownMs = stkCooldown.msRemaining(state.admissionNo);
+  if (cooldownMs > 0) {
+    errorEl.textContent = `Please wait ${Math.ceil(cooldownMs / 1000)}s before requesting another prompt.`;
+    errorEl.classList.remove('hidden');
+    return;
+  }
+  if (!/^(?:\+?254|0)7\d{8}$/.test(phone)) {
+    errorEl.textContent = 'Enter a valid Safaricom number, e.g. 0712345678.';
+    errorEl.classList.remove('hidden');
+    return;
+  }
+
+  try {
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Sending prompt...';
+    stkCooldown.record(state.admissionNo);
+
+    const { checkoutRequestId } = await rateLimitedCall(
+      () => callGoogleAppsScript('initiateStkPush', [state.admissionNo, phone, CONFIG.termlyFeeKES, state.studentData.term]),
+      { cost: 3, context: 'stkInitiate' }
+    );
+
+    document.getElementById('stkPhoneDisplay').textContent = phone;
+    showPaywallStep('Pending');
+
+    stkPollController.start(checkoutRequestId, {
+      onSuccess: () => {
+        document.getElementById('stkResultIcon').innerHTML = '<span style="color:var(--ok);font-size:22px;">✓</span>';
+        document.getElementById('stkResultIcon').style.borderColor = 'var(--ok)';
+        document.getElementById('stkResultTitle').textContent = 'Payment received';
+        document.getElementById('stkResultMessage').textContent = `This term's results are now unlocked for ${state.studentData.studentName}.`;
+        document.getElementById('stkResultActionBtn').textContent = 'View Results';
+        document.getElementById('stkResultActionBtn').onclick = () => {
+          transitionTo('paywallPage', 'dashboardPage');
+          showSkeletonLoader();
+          setTimeout(() => { displayDashboard(); sessionManager.start(); }, 320);
+        };
+        showPaywallStep('Result');
+        showNotification('M-Pesa payment confirmed.', 'success');
+      },
+      onFailure: (status) => {
+        document.getElementById('stkResultIcon').innerHTML = '<span style="color:var(--danger);font-size:22px;">✕</span>';
+        document.getElementById('stkResultIcon').style.borderColor = 'var(--danger)';
+        document.getElementById('stkResultTitle').textContent = 'Payment not completed';
+        document.getElementById('stkResultMessage').textContent = status.reason || 'The M-Pesa request was not completed. You can try again.';
+        document.getElementById('stkResultActionBtn').textContent = 'Try Again';
+        document.getElementById('stkResultActionBtn').onclick = () => openPaywall(state.studentData.term);
+        showPaywallStep('Result');
+      },
+      onTimeout: () => {
+        document.getElementById('stkResultIcon').innerHTML = '<span style="color:var(--warn);font-size:22px;">!</span>';
+        document.getElementById('stkResultIcon').style.borderColor = 'var(--warn)';
+        document.getElementById('stkResultTitle').textContent = 'No response received';
+        document.getElementById('stkResultMessage').textContent = "We didn't receive confirmation in time. If you completed the payment, it may still go through — otherwise, try again.";
+        document.getElementById('stkResultActionBtn').textContent = 'Try Again';
+        document.getElementById('stkResultActionBtn').onclick = () => openPaywall(state.studentData.term);
+        showPaywallStep('Result');
+      }
+    });
+
+  } catch (error) {
+    if (!String(error.message).startsWith('RateLimited:')) {
+      errorEl.textContent = error.message;
+      errorEl.classList.remove('hidden');
+    }
+    ErrorHandler.handle(error, 'initiateStkPush');
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Pay with M-Pesa';
+  }
+});
+
+document.getElementById('stkCancelBtn').addEventListener('click', () => {
+  stkPollController.stop();
+  showNotification('Payment cancelled.', 'info');
+  openPaywall(state.studentData ? state.studentData.term : '');
+});
 
 /* =========================================================================
    SKELETON LOADING
@@ -1103,6 +1387,29 @@ function overallLevelFromSubjects(subjects) {
   const overallBand = overallCode.replace(/[0-9]/g, '');
   const breakdown = `${subjects.map(s => s.levelCode).join('+')} = ${overallCode} (${sum})`;
   return { overallBand, overallCode, sum, breakdown };
+}
+
+/**
+ * Takes the raw response from getStudentResult (whether from mock data or a
+ * live Google Sheet backend — both only need to send { name, marks } per
+ * subject, plus the student/term fields) and derives everything computed:
+ * per-subject level codes, total marks, and the overall level breakdown.
+ * This is the single place that shape gets built, so mock and live data
+ * always render identically.
+ */
+function normalizeStudentResult(raw) {
+  const subjects = (raw.subjects || []).map(s => ({ ...s, ...levelCodeFromMarks(Number(s.marks)) }));
+  const totalMarks = raw.totalMarks ?? subjects.reduce((sum, s) => sum + s.marks, 0);
+  const overall = subjects.length ? overallLevelFromSubjects(subjects) : { overallBand: '—', overallCode: '—', breakdown: 'No subjects recorded yet.' };
+
+  return {
+    ...raw,
+    subjects,
+    totalMarks,
+    overallLevel: raw.overallLevel || overall.overallBand,
+    overallLevelCode: raw.overallLevelCode || overall.overallCode,
+    overallBreakdown: raw.overallBreakdown || overall.breakdown
+  };
 }
 
 const LEVEL_META = {
@@ -1377,9 +1684,18 @@ function downloadReportCardPdf() {
   const data = state.studentData;
   if (!data) { showNotification('No results loaded yet.', 'warning'); return; }
 
+  if (!window.jspdf || !window.jspdf.jsPDF) {
+    showNotification('PDF library failed to load — check your internet connection and try again.', 'error');
+    ErrorHandler.handle(new Error('jsPDF failed to load from CDN'), 'downloadReportCardPdf:missingLib');
+    return;
+  }
+
   try {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+    if (typeof doc.autoTable !== 'function') {
+      throw new Error('jspdf-autotable plugin failed to load — PDF cannot include tables.');
+    }
     const pageWidth = doc.internal.pageSize.getWidth();
     const margin = 54;
     const navy = [11, 31, 58];
