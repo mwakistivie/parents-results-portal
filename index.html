@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Results Portal</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
@@ -751,9 +751,16 @@ async function rateLimitedCall(fn, { cost = 1, context = 'request' } = {}) {
 async function callGoogleAppsScript(functionName, params = []) {
   if (CONFIG.useMockData) return mockApiCall(functionName, params);
 
+  // IMPORTANT: Content-Type must be 'text/plain', not 'application/json'.
+  // Apps Script Web Apps don't implement doOptions(), so a JSON content-type
+  // triggers a CORS preflight (OPTIONS) request that Apps Script can't answer,
+  // and the whole call fails with a CORS error before it's even sent. Using
+  // 'text/plain' keeps this a "simple request" (no preflight); Apps Script's
+  // doPost() still receives the raw JSON string via e.postData.contents and
+  // JSON.parse()s it exactly the same way.
   const response = await fetch(CONFIG.scriptUrl, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
     body: JSON.stringify({ function: functionName, parameters: params })
   });
   if (!response.ok) {
