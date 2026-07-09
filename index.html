@@ -849,6 +849,8 @@ function mockApiCall(functionName, params) {
           mockWriteSubscriptions(store);
           resolve({ status: 'SUCCESS', receiptNumber: 'MPX' + Math.random().toString(36).slice(2, 9).toUpperCase() });
         }
+      } else if (functionName === 'checkForceLogout') {
+        resolve({ forceLogout: false });
       } else {
         resolve(null);
       }
@@ -1021,6 +1023,46 @@ document.getElementById('staySignedInBtn').addEventListener('click', () => sessi
 document.getElementById('sessionLogoutBtn').addEventListener('click', () => handleLogout());
 
 /* =========================================================================
+   FORCE LOGOUT
+   -------------------------------------------------------------------------
+   Lets school staff immediately end an active parent session (e.g. a PIN
+   was shared with the wrong person) by setting ForceLogoutAt on that
+   student's row in the Students sheet. This polls in the background while
+   the dashboard is open and signs the parent out automatically.
+   ========================================================================= */
+class ForceLogoutMonitor {
+  constructor(intervalMs = 60000) {
+    this.intervalMs = intervalMs;
+    this.timer = null;
+  }
+  start() {
+    this.stop();
+    this.timer = setInterval(() => this.check(), this.intervalMs);
+  }
+  stop() {
+    clearInterval(this.timer);
+    this.timer = null;
+  }
+  async check() {
+    if (!state.admissionNo || !state.loginTimestamp) return;
+    try {
+      const result = await rateLimitedCall(
+        () => callGoogleAppsScript('checkForceLogout', [state.admissionNo, state.loginTimestamp]),
+        { cost: 1, context: 'forceLogoutCheck' }
+      );
+      if (result && result.forceLogout) {
+        this.stop();
+        handleLogout({ reason: 'Your session was ended by the school. Please sign in again.' });
+      }
+    } catch (e) {
+      // Silent — a missed check just gets retried on the next interval; no need to alarm the parent over it.
+      console.warn('Force-logout check failed:', e.message);
+    }
+  }
+}
+const forceLogoutMonitor = new ForceLogoutMonitor();
+
+/* =========================================================================
    LOGIN FLOW (with rate limiting)
    ========================================================================= */
 const loginForm = document.getElementById('loginForm');
@@ -1118,6 +1160,7 @@ async function handleLogin() {
     state.studentData = normalizeStudentResult(result);
     state.admissionNo = admissionNo;
     state.pin = pin;
+    state.loginTimestamp = new Date().toISOString();
 
     const subscription = await rateLimitedCall(
       () => callGoogleAppsScript('getSubscriptionStatus', [admissionNo, result.term]),
@@ -1132,6 +1175,7 @@ async function handleLogin() {
       setTimeout(() => {
         displayDashboard();
         sessionManager.start();
+        forceLogoutMonitor.start();
         showNotification(`Welcome back — results loaded for ${result.studentName}.`, 'success');
       }, 320);
     } else {
@@ -1158,14 +1202,16 @@ async function handleLogin() {
   }
 }
 
-function handleLogout() {
+function handleLogout(options = {}) {
   sessionManager.stop();
+  forceLogoutMonitor.stop();
   closeAllModals();
   state.studentData = null;
   state.pin = null;
   document.getElementById('pin').value = '';
   const currentPage = document.getElementById('dashboardPage').classList.contains('hidden') ? 'paywallPage' : 'dashboardPage';
   transitionTo(currentPage, 'loginPage');
+  if (options.reason) showNotification(options.reason, 'warning');
 }
 document.getElementById('logoutBtn').addEventListener('click', handleLogout);
 document.getElementById('paywallBackBtn').addEventListener('click', () => {
@@ -1302,7 +1348,7 @@ document.getElementById('stkPushForm').addEventListener('submit', async (e) => {
         document.getElementById('stkResultActionBtn').onclick = () => {
           transitionTo('paywallPage', 'dashboardPage');
           showSkeletonLoader();
-          setTimeout(() => { displayDashboard(); sessionManager.start(); }, 320);
+          setTimeout(() => { displayDashboard(); sessionManager.start(); forceLogoutMonitor.start(); }, 320);
         };
         showPaywallStep('Result');
         showNotification('M-Pesa payment confirmed.', 'success');
